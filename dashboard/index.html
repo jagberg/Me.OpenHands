@@ -2,53 +2,67 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>OpenHands Runs</title>
 <style>
-:root{--bg:#f6f7f9;--card:#fff;--fg:#1a1d21;--mut:#6b7280;--line:#e5e7eb;--ok:#15803d;--bad:#b91c1c;--run:#b45309;--acc:#2563eb}
-@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#171a20;--fg:#e6e8eb;--mut:#9aa3af;--line:#2a2f38;--ok:#4ade80;--bad:#f87171;--run:#fbbf24;--acc:#60a5fa}}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,sans-serif}
-main{max-width:980px;margin:0 auto;padding:24px 16px}h1{font-size:20px;margin:0 0 4px}.sub{color:var(--mut);margin-bottom:20px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
-.head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.badge{font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;border:1px solid currentColor}
-.success{color:var(--ok)}.failed{color:var(--bad)}.running{color:var(--run)}.done{color:var(--ok)}.error{color:var(--bad)}
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:14px 0}
-.tile{border:1px solid var(--line);border-radius:8px;padding:8px 10px}.tile b{display:block;font-size:18px}.tile span{color:var(--mut);font-size:12px}
-table{width:100%;border-collapse:collapse;margin:8px 0;font-size:13px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}th{color:var(--mut);font-weight:600}
-td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
-pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;font-size:12px;max-height:260px}
-details{margin-top:8px}summary{cursor:pointer;color:var(--acc)}a{color:var(--acc)}.mut{color:var(--mut)}
-@media(max-width:600px){th:nth-child(n+6),td:nth-child(n+6){display:none}}
-</style></head><body><main>
-<h1>OpenHands runs</h1><div class="sub">Local Ollama evaluation · refreshes every 3s · <span id="upd"></span></div>
-<div id="runs"></div></main>
+:root{--bg:#0b0d10;--side:#0e1115;--card:#12151a;--line:#1f242c;--fg:#e8eaed;--mut:#8b93a0;--acc:#ff6a2b;--ok:#34d399;--bad:#f87171;--run:#fbbf24;--wait:#a78bfa}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:13px/1.45 system-ui,sans-serif;display:flex;min-height:100vh}
+aside{width:200px;background:var(--side);border-right:1px solid var(--line);padding:14px 10px;flex:none}
+.logo{font-weight:700;font-size:15px;margin:0 6px 2px}.logo i{display:inline-block;width:14px;height:14px;background:var(--acc);border-radius:3px;margin-right:6px;vertical-align:-2px}
+.tag{color:var(--mut);font-size:10px;letter-spacing:.08em;margin:0 6px 18px}.sec{color:var(--mut);font-size:10px;letter-spacing:.1em;margin:14px 6px 4px}
+.nav{padding:7px 10px;border-radius:6px;color:var(--mut)}.nav.on{background:#2a1a12;color:var(--acc);border:1px solid #4a2a1a}
+main{flex:1;padding:18px 22px;min-width:0}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}h1{font-size:18px;margin:0}
+button,select,input{background:var(--card);color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 10px;font:inherit}button.pri{background:var(--acc);border-color:var(--acc);color:#111;font-weight:600}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}.tile{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px 14px}
+.tile span{color:var(--mut);font-size:11px;letter-spacing:.06em;text-transform:uppercase}.tile b{display:block;font-size:26px;margin-top:2px}
+.bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px}.chip{cursor:pointer;color:var(--mut);font-size:11px;padding:4px 9px;border:1px solid var(--line);border-radius:5px;text-transform:uppercase}.chip.on{color:var(--acc);border-color:var(--acc);background:#2a1a12}
+.bar input{flex:1;min-width:160px}table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+th{color:var(--mut);font-size:10px;letter-spacing:.08em;text-transform:uppercase;text-align:left;padding:9px 12px;border-bottom:1px solid var(--line)}
+td{padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:middle}tr.row{cursor:pointer}tr.row:hover td{background:#171b21}
+.id{font-family:ui-monospace,monospace;font-size:11px;color:var(--mut)}.badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:5px;letter-spacing:.04em}
+.COMPLETED{color:var(--ok);background:#0f2a22}.RUNNING{color:var(--run);background:#2b2410}.FAILED{color:var(--bad);background:#2d1515}.AWAITING{color:var(--wait);background:#1e1a33}
+.det td{background:#0e1115;padding:14px 18px}.mini{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin:8px 0}.mini div{border:1px solid var(--line);border-radius:6px;padding:6px 9px}.mini b{display:block;font-size:16px}.mini span{color:var(--mut);font-size:11px}
+table.in{background:none;border:0;margin:6px 0}table.in td,table.in th{padding:5px 8px}pre{background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:10px;overflow:auto;max-height:240px;font-size:11px}
+details summary{cursor:pointer;color:var(--acc);margin-top:6px}a{color:var(--acc)}.n{text-align:right;font-variant-numeric:tabular-nums}.mut{color:var(--mut)}
+@media(max-width:760px){aside{display:none}.tiles{grid-template-columns:repeat(2,1fr)}.hide{display:none}}
+</style></head><body>
+<aside><div class="logo"><i></i>RunView</div><div class="tag">FOR OPENHANDS · LOCAL</div>
+<div class="sec">OPERATE</div><div class="nav on">▦ Runs</div><div class="nav">✓ Approvals</div>
+<div class="sec">AUTONOMY</div><div class="mut" style="padding:0 6px;font-size:11px">AI-first: agent writes, human reviews the PR.</div></aside>
+<main><div class="top"><h1>Runs</h1><div><span class="mut" id="upd"></span> <button onclick="tick()">⟳ Refresh</button></div></div>
+<div class="tiles" id="tiles"></div>
+<div class="bar" id="chips"></div>
+<table><thead><tr><th>Status</th><th>Workflow / ID</th><th class="hide">Agent</th><th class="hide">Environment</th><th class="hide">Triggered by</th><th>Started</th><th>Duration</th><th>Pending</th><th></th></tr></thead><tbody id="body"></tbody></table></main>
 <script>
 const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-const fmt=n=>Number(n||0).toLocaleString();
-const dur=s=>s>=60?Math.floor(s/60)+"m "+Math.round(s%60)+"s":Math.round(s)+"s";
-function render(runs){
-  if(!runs.length){document.getElementById("runs").innerHTML='<div class="card mut">No runs yet. Run pipeline/run.py.</div>';return}
-  document.getElementById("runs").innerHTML=runs.map(r=>{
-    const st=r.stages||[],sum=k=>st.reduce((a,s)=>a+(s[k]||0),0);
-    const t=r.tests||{},open=r.status==="running"?"open":"";
-    return `<div class="card"><div class="head"><b>${esc(r.id)}</b><span class="badge ${esc(r.status)}">${esc(r.status)}</span>
-      <span class="mut">${esc(r.model)} · ${esc(r.repo)}</span>
-      ${r.pr_url?`<a href="${esc(r.pr_url)}" target="_blank" rel="noopener">PR ↗</a>`:""}</div>
-      <p>${esc(r.problem)}</p>
-      <div class="tiles">
-        <div class="tile"><b>${dur(sum("duration_s"))}</b><span>wall time</span></div>
-        <div class="tile"><b>${fmt(sum("llm_calls"))}</b><span>LLM calls</span></div>
-        <div class="tile"><b>${fmt(sum("prompt_tokens"))} / ${fmt(sum("completion_tokens"))}</b><span>tokens in / out</span></div>
-        <div class="tile"><b>${fmt(sum("tool_calls"))}</b><span>tool calls</span></div>
-        <div class="tile"><b>$${sum("cost_usd").toFixed(2)}</b><span>cost (local)</span></div>
-        <div class="tile"><b class="${t.before?(t.before.passed?"success":"failed"):""}">${t.before?(t.before.passed?"PASS":"FAIL"):"–"} → <span class="${t.after?(t.after.passed?"success":"failed"):""}" style="font-size:inherit;color:inherit">${t.after?(t.after.passed?"PASS":"FAIL"):"–"}</span></b><span>tests before → after</span></div>
-      </div>
-      <table><tr><th>Stage</th><th>Status</th><th class="n">Time</th><th class="n">LLM calls</th><th class="n">Tokens in</th><th class="n">Tokens out</th><th class="n">Avg latency</th><th class="n">Tool calls</th></tr>
-      ${st.map(s=>`<tr><td>${esc(s.name)}</td><td class="${esc(s.status)}">${esc(s.status)}</td><td class="n">${s.duration_s!=null?dur(s.duration_s):"…"}</td><td class="n">${fmt(s.llm_calls)}</td><td class="n">${fmt(s.prompt_tokens)}</td><td class="n">${fmt(s.completion_tokens)}</td><td class="n">${s.avg_latency_s??0}s</td><td class="n">${fmt(s.tool_calls)}</td></tr>`).join("")}</table>
-      ${r.summary?`<h3>Summary</h3><p>${esc(r.summary)}</p>`:""}
-      ${r.error?`<h3 class="failed">Error</h3><pre>${esc(r.error)}</pre>`:""}
-      ${r.diff&&r.diff.patch?`<details ${open}><summary>Diff</summary><pre>${esc(r.diff.patch)}</pre></details>`:""}
-      ${Object.entries(r.artifacts||{}).map(([k,v])=>`<details><summary>ignite: ${esc(k)}.md</summary><pre>${esc(v)}</pre></details>`).join("")}
-      </div>`}).join("");
-  document.getElementById("upd").textContent="updated "+new Date().toLocaleTimeString();
+const fmt=n=>Number(n||0).toLocaleString(),dur=s=>s>=60?Math.floor(s/60)+"m "+Math.round(s%60)+"s":Math.round(s)+"s";
+let runs=[],statusF="ALL",timeF="24",q="",open=new Set();
+const sum=(r,k)=>(r.stages||[]).reduce((a,s)=>a+(s[k]||0),0);
+const st=r=>r.status==="running"?"RUNNING":r.status==="failed"?"FAILED":(r.pr_state==="OPEN"?"AWAITING":"COMPLETED");
+const inTime=r=>timeF==="all"||Date.now()-new Date(r.started)<timeF*3600e3;
+function render(){
+  const win=runs.filter(inTime),c=k=>win.filter(r=>st(r)===k).length;
+  tiles.innerHTML=[["Running","RUNNING"],["Awaiting human","AWAITING"],["Failed","FAILED"],["Completed","COMPLETED"]].map(([l,k])=>`<div class="tile"><span>${l}</span><b>${c(k)}</b></div>`).join("");
+  chips.innerHTML=["ALL","RUNNING","AWAITING","FAILED","COMPLETED"].map(k=>`<span class="chip ${statusF===k?"on":""}" data-k="${k}">${k}</span>`).join("")+
+   `<select id="tf"><option value="1">last 1h</option><option value="24">last 24h</option><option value="168">last 7d</option><option value="all">all time</option></select><input id="qf" placeholder="Filter by run id, PR url, model…" value="${esc(q)}">`;
+  tf.value=timeF;
+  chips.querySelectorAll(".chip").forEach(e=>e.onclick=()=>{statusF=e.dataset.k;render()});
+  tf.onchange=()=>{timeF=tf.value;render()};qf.oninput=()=>{q=qf.value;render();qf.focus();qf.setSelectionRange(q.length,q.length)};
+  const rows=win.filter(r=>(statusF==="ALL"||st(r)===statusF)&&(JSON.stringify([r.id,r.pr_url,r.model,r.problem]).toLowerCase().includes(q.toLowerCase())));
+  body.innerHTML=rows.map(r=>{const s=st(r),d=sum(r,"duration_s"),o=open.has(r.id);
+   return `<tr class="row" data-id="${esc(r.id)}"><td><span class="badge ${s}">${s}</span></td><td><b>IgniteFixWorkflow</b><div class="id">${esc(r.id)}</div></td>
+   <td class="hide">${esc((r.model||"").replace("ollama_chat/",""))}</td><td class="hide">local · ollama</td><td class="hide">${esc(r.triggered_by||"cli")}</td>
+   <td>${new Date(r.started).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}</td><td>${dur(d)}</td><td>${s==="AWAITING"?"PR review":"—"}</td><td>${o?"▾":"↗"}</td></tr>`+(o?detail(r):"")}).join("")||`<tr><td colspan="9" class="mut">No runs match.</td></tr>`;
+  body.querySelectorAll("tr.row").forEach(e=>e.onclick=()=>{open.has(e.dataset.id)?open.delete(e.dataset.id):open.add(e.dataset.id);render()});
+  upd.textContent="updated "+new Date().toLocaleTimeString();
 }
-async function tick(){try{render(await (await fetch("/api/runs")).json())}catch(e){document.getElementById("upd").textContent="server unreachable"}}
+function detail(r){const t=r.tests||{},p=x=>x?(x.passed?"PASS":"FAIL"):"–";
+ return `<tr class="det"><td colspan="9"><div>${esc(r.problem)}</div>
+ <div class="mini"><div><b>${fmt(sum(r,"llm_calls"))}</b><span>LLM calls</span></div><div><b>${fmt(sum(r,"prompt_tokens"))} / ${fmt(sum(r,"completion_tokens"))}</b><span>tokens in / out</span></div>
+ <div><b>${fmt(sum(r,"tool_calls"))}</b><span>tool calls</span></div><div><b>$${sum(r,"cost_usd").toFixed(2)}</b><span>cost (local)</span></div><div><b>${p(t.before)} → ${p(t.after)}</b><span>tests</span></div>
+ <div><b>${r.pr_url?`<a href="${esc(r.pr_url)}" target="_blank" rel="noopener">${esc(r.pr_state||"PR")} ↗</a>`:"–"}</b><span>pull request</span></div></div>
+ <table class="in"><tr><th>Stage</th><th>Status</th><th class="n">Time</th><th class="n">LLM calls</th><th class="n">Tokens in</th><th class="n">Tokens out</th><th class="n">Avg latency</th><th class="n">Tools</th></tr>
+ ${(r.stages||[]).map(s=>`<tr><td>${esc(s.name)}</td><td><span class="badge ${s.status==="done"?"COMPLETED":s.status==="error"?"FAILED":"RUNNING"}">${esc(s.status)}</span></td><td class="n">${s.duration_s!=null?dur(s.duration_s):"…"}</td><td class="n">${fmt(s.llm_calls)}</td><td class="n">${fmt(s.prompt_tokens)}</td><td class="n">${fmt(s.completion_tokens)}</td><td class="n">${s.avg_latency_s??0}s</td><td class="n">${fmt(s.tool_calls)}</td></tr>`).join("")}</table>
+ ${r.summary?`<b>Summary</b><p>${esc(r.summary)}</p>`:""}${r.error?`<b style="color:var(--bad)">Error</b><pre>${esc(r.error)}</pre>`:""}
+ ${r.diff&&r.diff.patch?`<details><summary>Diff</summary><pre>${esc(r.diff.patch)}</pre></details>`:""}
+ ${Object.entries(r.artifacts||{}).map(([k,v])=>`<details><summary>ignite: ${esc(k)}.md</summary><pre>${esc(v)}</pre></details>`).join("")}</td></tr>`}
+async function tick(){try{runs=await (await fetch("/api/runs")).json();if(!document.activeElement||document.activeElement.id!=="qf")render()}catch(e){upd.textContent="server unreachable"}}
 tick();setInterval(tick,3000);
 </script></body></html>
