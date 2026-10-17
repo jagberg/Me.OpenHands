@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenHands Runs</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--fg:#1a1d21;--mut:#6b7280;--line:#e5e7eb;--ok:#15803d;--bad:#b91c1c;--run:#b45309;--acc:#2563eb}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#171a20;--fg:#e6e8eb;--mut:#9aa3af;--line:#2a2f38;--ok:#4ade80;--bad:#f87171;--run:#fbbf24;--acc:#60a5fa}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,sans-serif}
+main{max-width:980px;margin:0 auto;padding:24px 16px}h1{font-size:20px;margin:0 0 4px}.sub{color:var(--mut);margin-bottom:20px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:16px}
+.head{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.badge{font-size:12px;font-weight:600;padding:2px 8px;border-radius:99px;border:1px solid currentColor}
+.success{color:var(--ok)}.failed{color:var(--bad)}.running{color:var(--run)}.done{color:var(--ok)}.error{color:var(--bad)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:14px 0}
+.tile{border:1px solid var(--line);border-radius:8px;padding:8px 10px}.tile b{display:block;font-size:18px}.tile span{color:var(--mut);font-size:12px}
+table{width:100%;border-collapse:collapse;margin:8px 0;font-size:13px}th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}th{color:var(--mut);font-weight:600}
+td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow:auto;font-size:12px;max-height:260px}
+details{margin-top:8px}summary{cursor:pointer;color:var(--acc)}a{color:var(--acc)}.mut{color:var(--mut)}
+@media(max-width:600px){th:nth-child(n+6),td:nth-child(n+6){display:none}}
+</style></head><body><main>
+<h1>OpenHands runs</h1><div class="sub">Local Ollama evaluation · refreshes every 3s · <span id="upd"></span></div>
+<div id="runs"></div></main>
+<script>
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt=n=>Number(n||0).toLocaleString();
+const dur=s=>s>=60?Math.floor(s/60)+"m "+Math.round(s%60)+"s":Math.round(s)+"s";
+function render(runs){
+  if(!runs.length){document.getElementById("runs").innerHTML='<div class="card mut">No runs yet. Run pipeline/run.py.</div>';return}
+  document.getElementById("runs").innerHTML=runs.map(r=>{
+    const st=r.stages||[],sum=k=>st.reduce((a,s)=>a+(s[k]||0),0);
+    const t=r.tests||{},open=r.status==="running"?"open":"";
+    return `<div class="card"><div class="head"><b>${esc(r.id)}</b><span class="badge ${esc(r.status)}">${esc(r.status)}</span>
+      <span class="mut">${esc(r.model)} · ${esc(r.repo)}</span>
+      ${r.pr_url?`<a href="${esc(r.pr_url)}" target="_blank" rel="noopener">PR ↗</a>`:""}</div>
+      <p>${esc(r.problem)}</p>
+      <div class="tiles">
+        <div class="tile"><b>${dur(sum("duration_s"))}</b><span>wall time</span></div>
+        <div class="tile"><b>${fmt(sum("llm_calls"))}</b><span>LLM calls</span></div>
+        <div class="tile"><b>${fmt(sum("prompt_tokens"))} / ${fmt(sum("completion_tokens"))}</b><span>tokens in / out</span></div>
+        <div class="tile"><b>${fmt(sum("tool_calls"))}</b><span>tool calls</span></div>
+        <div class="tile"><b>$${sum("cost_usd").toFixed(2)}</b><span>cost (local)</span></div>
+        <div class="tile"><b class="${t.before?(t.before.passed?"success":"failed"):""}">${t.before?(t.before.passed?"PASS":"FAIL"):"–"} → <span class="${t.after?(t.after.passed?"success":"failed"):""}" style="font-size:inherit;color:inherit">${t.after?(t.after.passed?"PASS":"FAIL"):"–"}</span></b><span>tests before → after</span></div>
+      </div>
+      <table><tr><th>Stage</th><th>Status</th><th class="n">Time</th><th class="n">LLM calls</th><th class="n">Tokens in</th><th class="n">Tokens out</th><th class="n">Avg latency</th><th class="n">Tool calls</th></tr>
+      ${st.map(s=>`<tr><td>${esc(s.name)}</td><td class="${esc(s.status)}">${esc(s.status)}</td><td class="n">${s.duration_s!=null?dur(s.duration_s):"…"}</td><td class="n">${fmt(s.llm_calls)}</td><td class="n">${fmt(s.prompt_tokens)}</td><td class="n">${fmt(s.completion_tokens)}</td><td class="n">${s.avg_latency_s??0}s</td><td class="n">${fmt(s.tool_calls)}</td></tr>`).join("")}</table>
+      ${r.summary?`<h3>Summary</h3><p>${esc(r.summary)}</p>`:""}
+      ${r.error?`<h3 class="failed">Error</h3><pre>${esc(r.error)}</pre>`:""}
+      ${r.diff&&r.diff.patch?`<details ${open}><summary>Diff</summary><pre>${esc(r.diff.patch)}</pre></details>`:""}
+      ${Object.entries(r.artifacts||{}).map(([k,v])=>`<details><summary>ignite: ${esc(k)}.md</summary><pre>${esc(v)}</pre></details>`).join("")}
+      </div>`}).join("");
+  document.getElementById("upd").textContent="updated "+new Date().toLocaleTimeString();
+}
+async function tick(){try{render(await (await fetch("/api/runs")).json())}catch(e){document.getElementById("upd").textContent="server unreachable"}}
+tick();setInterval(tick,3000);
+</script></body></html>
