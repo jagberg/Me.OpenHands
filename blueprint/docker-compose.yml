@@ -1,0 +1,29 @@
+# Temporal dev server + UI. Worker runs on the host by default (needs your git/gh logins); see README.
+services:
+  temporal:
+    image: temporalio/temporal:latest
+    # mounted at the image user's home: a fresh named volume inherits uid 1000 ownership (a /data mount is root-owned and SQLite fails)
+    command: server start-dev --ip 0.0.0.0 --ui-port 8233 --db-filename /home/temporal/temporal.db
+    ports:
+      - "127.0.0.1:7233:7233"   # gRPC
+      - "127.0.0.1:8233:8233"   # Web UI
+    volumes:
+      - temporal-data:/home/temporal
+    restart: unless-stopped
+  # Optional containerised worker: docker compose --profile worker up -d --build   (needs GH_TOKEN in .env for private repos)
+  worker:
+    profiles: ["worker"]
+    build: .
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      LLM_MODEL: ${LLM_MODEL:-ollama_chat/qwen3-14b-oh}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
+      GIT_BASE: https://github.com/
+      GH_TOKEN: ${GH_TOKEN:-}
+      DATA_DIR: /data/runs
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    volumes:
+      - ../runs:/data/runs
+    depends_on: [temporal]
+volumes:
+  temporal-data:

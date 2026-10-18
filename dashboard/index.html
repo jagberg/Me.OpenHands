@@ -26,7 +26,7 @@ details summary{cursor:pointer;color:var(--acc);margin-top:6px}a{color:var(--acc
 <aside><div class="logo"><i></i>RunView</div><div class="tag">FOR OPENHANDS · LOCAL</div>
 <div class="sec">OPERATE</div><div class="nav on">▦ Runs</div><div class="nav">✓ Approvals</div>
 <div class="sec">AUTONOMY</div><div class="mut" style="padding:0 6px;font-size:11px">AI-first: agent writes, human reviews the PR.</div></aside>
-<main><div class="top"><h1>Runs</h1><div><span class="mut" id="upd"></span> <button onclick="tick()">⟳ Refresh</button></div></div>
+<main><div class="top"><h1>Runs</h1><div><span class="mut" id="upd"></span> <button onclick="tick()">⟳ Refresh</button> <button class="pri" onclick="newRun()">+ New run</button></div></div>
 <div class="tiles" id="tiles"></div>
 <div class="bar" id="chips"></div>
 <table><thead><tr><th>Status</th><th>Workflow / ID</th><th class="hide">Agent</th><th class="hide">Environment</th><th class="hide">Triggered by</th><th>Started</th><th>Duration</th><th>Pending</th><th></th></tr></thead><tbody id="body"></tbody></table></main>
@@ -35,7 +35,17 @@ const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&g
 const fmt=n=>Number(n||0).toLocaleString(),dur=s=>s>=60?Math.floor(s/60)+"m "+Math.round(s%60)+"s":Math.round(s)+"s";
 let runs=[],statusF="ALL",timeF="24",q="",open=new Set();
 const sum=(r,k)=>(r.stages||[]).reduce((a,s)=>a+(s[k]||0),0);
-const st=r=>r.status==="running"?"RUNNING":r.status==="failed"?"FAILED":(r.pr_state==="OPEN"?"AWAITING":"COMPLETED");
+const st=r=>["running","queued","ai_review"].includes(r.status)?"RUNNING":r.status==="failed"?"FAILED":
+  (r.status==="awaiting_decision"||r.status==="human_review"||(r.status==="success"&&r.pr_state==="OPEN"))?"AWAITING":"COMPLETED";
+const label=r=>({awaiting_decision:"DECISION",human_review:"REVIEW",merged:"MERGED",closed:"CLOSED",ai_review:"AI REVIEW"})[r.status]||st(r);
+const pending=r=>r.status==="awaiting_decision"?"Decision: "+((r.questions||[]).find(q=>q.status==="open"&&q.blocking)||{}).id:
+  st(r)==="AWAITING"?"PR review":(r.questions||[]).some(q=>q.status==="open")?"Question (non-blocking)":"—";
+const secs=(a,b)=>a&&b?(new Date(b)-new Date(a))/1000:null;
+const humanWait=r=>(r.questions||[]).reduce((s,q)=>s+(secs(q.asked_at,q.answered_at)||0),0);
+const TEMPORAL="http://localhost:8233/namespaces/default/workflows";
+async function post(url,data){const r=await fetch(url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(data)});const j=await r.json();if(!r.ok)alert(j.error||"failed");return j}
+async function answerQ(id,qid){const v=document.getElementById("a-"+id+"-"+qid).value.trim();if(!v)return;await post(`/api/runs/${id}/answer`,{qid,answer:v});tick()}
+async function newRun(){const title=prompt("Ticket title");if(!title)return;const brief=prompt("Ticket description / acceptance criteria",title);if(brief==null)return;const j=await post("/api/briefs",{title,brief});if(j.id){open.add(j.id);tick()}}
 const inTime=r=>timeF==="all"||Date.now()-new Date(r.started)<timeF*3600e3;
 function render(){
   const win=runs.filter(inTime),c=k=>win.filter(r=>st(r)===k).length;
@@ -47,9 +57,9 @@ function render(){
   tf.onchange=()=>{timeF=tf.value;render()};qf.oninput=()=>{q=qf.value;render();qf.focus();qf.setSelectionRange(q.length,q.length)};
   const rows=win.filter(r=>(statusF==="ALL"||st(r)===statusF)&&(JSON.stringify([r.id,r.pr_url,r.model,r.problem]).toLowerCase().includes(q.toLowerCase())));
   body.innerHTML=rows.map(r=>{const s=st(r),d=sum(r,"duration_s"),o=open.has(r.id);
-   return `<tr class="row" data-id="${esc(r.id)}"><td><span class="badge ${s}">${s}</span></td><td><b>IgniteFixWorkflow</b><div class="id">${esc(r.id)}</div></td>
-   <td class="hide">${esc((r.model||"").replace("ollama_chat/",""))}</td><td class="hide">local · ollama</td><td class="hide">${esc(r.triggered_by||"cli")}</td>
-   <td>${new Date(r.started).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}</td><td>${dur(d)}</td><td>${s==="AWAITING"?"PR review":"—"}</td><td>${o?"▾":"↗"}</td></tr>`+(o?detail(r):"")}).join("")||`<tr><td colspan="9" class="mut">No runs match.</td></tr>`;
+   return `<tr class="row" data-id="${esc(r.id)}"><td><span class="badge ${s}">${label(r)}</span></td><td><b>${r.engine==="temporal"?"IgniteBlueprint":"IgniteFixWorkflow"}</b><div class="id">${esc(r.id)}${r.current_stage&&s!=="COMPLETED"?" · "+esc(r.current_stage):""}</div></td>
+   <td class="hide">${esc((r.model||"").replace("ollama_chat/",""))}</td><td class="hide">local · ${r.engine==="temporal"?"temporal":"script"}</td><td class="hide">${esc(r.source||r.triggered_by||"cli")}</td>
+   <td>${new Date(r.started).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}</td><td>${dur(d)}</td><td>${esc(pending(r))}</td><td>${o?"▾":"↗"}</td></tr>`+(o?detail(r):"")}).join("")||`<tr><td colspan="9" class="mut">No runs match.</td></tr>`;
   body.querySelectorAll("tr.row").forEach(e=>e.onclick=()=>{open.has(e.dataset.id)?open.delete(e.dataset.id):open.add(e.dataset.id);render()});
   upd.textContent="updated "+new Date().toLocaleTimeString();
 }
@@ -57,12 +67,19 @@ function detail(r){const t=r.tests||{},p=x=>x?(x.passed?"PASS":"FAIL"):"–";
  return `<tr class="det"><td colspan="9"><div>${esc(r.problem)}</div>
  <div class="mini"><div><b>${fmt(sum(r,"llm_calls"))}</b><span>LLM calls</span></div><div><b>${fmt(sum(r,"prompt_tokens"))} / ${fmt(sum(r,"completion_tokens"))}</b><span>tokens in / out</span></div>
  <div><b>${fmt(sum(r,"tool_calls"))}</b><span>tool calls</span></div><div><b>$${sum(r,"cost_usd").toFixed(2)}</b><span>cost (local)</span></div><div><b>${p(t.before)} → ${p(t.after)}</b><span>tests</span></div>
- <div><b>${r.pr_url?`<a href="${esc(r.pr_url)}" target="_blank" rel="noopener">${esc(r.pr_state||"PR")} ↗</a>`:"–"}</b><span>pull request</span></div></div>
+ <div><b>${r.pr_url?`<a href="${esc(r.pr_url)}" target="_blank" rel="noopener">${esc(r.pr_state||"PR")} ↗</a>`:"–"}</b><span>pull request</span></div>
+ <div><b>${secs(r.started,r.pr_opened)!=null?dur(secs(r.started,r.pr_opened)):"–"}</b><span>time to PR</span></div>
+ <div><b>${dur(humanWait(r))}</b><span>waiting on humans</span></div>
+ ${r.engine==="temporal"?`<div><b><a href="${TEMPORAL}?query=${encodeURIComponent(`WorkflowId="${r.id}"`)}" target="_blank" rel="noopener">history ↗</a></b><span>Temporal</span></div>`:""}</div>
+ ${(r.questions||[]).map(x=>`<div style="border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:6px 0"><span class="badge ${x.status==="open"?"AWAITING":"COMPLETED"}">${x.blocking?"BLOCKING ":""}${esc(x.id)}</span> <b>${esc(x.text)}</b> <span class="mut">(${esc(x.stage)})</span>
+   ${x.assumption?`<div class="mut">Agent assumption: ${esc(x.assumption)}</div>`:""}
+   ${x.status==="open"?`<div style="display:flex;gap:6px;margin-top:6px"><input id="a-${esc(r.id)}-${esc(x.id)}" style="flex:1" placeholder="Your decision…" onclick="event.stopPropagation()"><button class="pri" onclick="event.stopPropagation();answerQ('${esc(r.id)}','${esc(x.id)}')">Answer</button></div>`:`<div>→ ${esc(x.answer)} <span class="mut">${esc(x.answered_at||"")}</span></div>`}</div>`).join("")}
  <table class="in"><tr><th>Stage</th><th>Status</th><th class="n">Time</th><th class="n">LLM calls</th><th class="n">Tokens in</th><th class="n">Tokens out</th><th class="n">Avg latency</th><th class="n">Tools</th></tr>
  ${(r.stages||[]).map(s=>`<tr><td>${esc(s.name)}</td><td><span class="badge ${s.status==="done"?"COMPLETED":s.status==="error"?"FAILED":"RUNNING"}">${esc(s.status)}</span></td><td class="n">${s.duration_s!=null?dur(s.duration_s):"…"}</td><td class="n">${fmt(s.llm_calls)}</td><td class="n">${fmt(s.prompt_tokens)}</td><td class="n">${fmt(s.completion_tokens)}</td><td class="n">${s.avg_latency_s??0}s</td><td class="n">${fmt(s.tool_calls)}</td></tr>`).join("")}</table>
  ${r.summary?`<b>Summary</b><p>${esc(r.summary)}</p>`:""}${r.error?`<b style="color:var(--bad)">Error</b><pre>${esc(r.error)}</pre>`:""}
  ${r.diff&&r.diff.patch?`<details><summary>Diff</summary><pre>${esc(r.diff.patch)}</pre></details>`:""}
- ${Object.entries(r.artifacts||{}).map(([k,v])=>`<details><summary>ignite: ${esc(k)}.md</summary><pre>${esc(v)}</pre></details>`).join("")}</td></tr>`}
-async function tick(){try{runs=await (await fetch("/api/runs")).json();if(!document.activeElement||document.activeElement.id!=="qf")render()}catch(e){upd.textContent="server unreachable"}}
+ ${Object.entries(r.artifacts||{}).map(([k,v])=>`<details><summary>ignite: ${esc(k)}.md</summary><pre>${esc(v)}</pre></details>`).join("")}
+ ${(r.events||[]).length?`<details><summary>Lifecycle timeline (${r.events.length})</summary><pre>${esc(r.events.map(e=>`${e.ts}  ${e.kind.padEnd(12)} ${e.msg}`).join("\n"))}</pre></details>`:""}</td></tr>`}
+async function tick(){try{runs=await (await fetch("/api/runs")).json();const a=document.activeElement;if(!a||a.tagName!=="INPUT"||a.id==="qf")render()}catch(e){upd.textContent="server unreachable"}}
 tick();setInterval(tick,3000);
 </script></body></html>

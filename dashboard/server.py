@@ -44,6 +44,32 @@ class H(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def do_POST(self):
+        """Human-in-the-loop actions go to Temporal: answer -> signal, new brief -> start workflow.
+        Needs the blueprint venv: blueprint/.venv/bin/python dashboard/server.py"""
+        # ponytail: no auth; the server binds to 127.0.0.1 only. Add a token before exposing it on a network.
+        import asyncio
+        sys.path.insert(0, str(HERE.parent / "blueprint"))
+        import worker
+        try:
+            data = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))) or b"{}")
+            parts = self.path.strip("/").split("/")  # api/runs/<id>/answer | api/briefs
+            if parts[:2] == ["api", "runs"] and parts[-1] == "answer":
+                asyncio.run(worker.answer(parts[2], data["qid"], data["answer"]))
+                out = {"ok": True}
+            elif parts == ["api", "briefs"]:
+                out = {"id": asyncio.run(worker.start(data["title"], data["brief"], source=data.get("source", "dashboard")))}
+            else:
+                return self.send_error(404)
+            body, code = json.dumps(out).encode(), 200
+        except Exception as e:
+            body, code = json.dumps({"error": str(e)}).encode(), 400
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
     def log_message(self, *a):
         pass
 
