@@ -39,7 +39,7 @@ def _tests(rid, cfg):
 
 @activity.defn
 def write_run(state: dict) -> None:
-    """Dashboard reads runs/<id>/run.json; Temporal history stays the source of truth."""
+    """v1 only (frozen workflow_v1.py). v2 keeps state in Temporal and the dashboard queries it."""
     p = DATA / state["id"] / "run.json"
     p.parent.mkdir(parents=True, exist_ok=True)
     tmp = p.with_suffix(".tmp")
@@ -103,10 +103,11 @@ def agent_stage(rid: str, name: str, cfg: dict, ctx: dict) -> dict:
                completion_tokens=getattr(u, "completion_tokens", 0), avg_latency_s=round(sum(lat) / len(lat), 1) if lat else 0,
                cost_usd=m.accumulated_cost, tool_calls=len(actions), tools=sorted({a.tool_name for a in actions}))
     conv.close()
+    rec["question"] = harvest_question(rid, cfg)  # v2 reads it here (one activity instead of two); v1 ignores the key
     return rec
 
 
-@activity.defn
+@activity.defn  # registered for v1; v2 calls it inside agent_stage
 def harvest_question(rid: str, cfg: dict) -> dict | None:
     """Agents ask a human by writing .ignite/QUESTION.md (BLOCKING: or ASK: + ASSUMPTION:)."""
     f = wd(rid, cfg) / ".ignite" / "QUESTION.md"
@@ -195,12 +196,13 @@ def open_pr(rid: str, cfg: dict, s: dict) -> str:
     tot = lambda k: sum(x.get(k) or 0 for x in s["stages"])
     open_q = [q for q in s["questions"] if q["status"] == "open"]
     answered = [q for q in s["questions"] if q["status"] == "answered"]
-    body = (f"## Summary\n{s['summary']}\n\n## Ticket\n{s['title']} (source: {s['source']})\n\n"
-            "## Validation\n| Check | Result |\n|---|---|\n"
-            + "".join(f"| {k} | {'✅' if v else '❌'} |\n" for k, v in s["checks"].items())
+    body = (f"## Issue\n{s['title']} (source: {s['source']})\n\n"
+            + (f"## Resolution\n{s['resolution']}\n\n" if s.get("resolution") else
+               f"## Summary\n{s['summary']}\n\n## Validation\n| Check | Result |\n|---|---|\n"
+               + "".join(f"| {k} | {'✅' if v else '❌'} |\n" for k, v in s["checks"].items()))
             + f"\n## Lifecycle\n- stages: {' → '.join(x['name'] for x in s['stages'])}\n"
             f"- {tot('llm_calls')} LLM calls, {tot('prompt_tokens')} in / {tot('completion_tokens')} out tokens, model `{s['model']}`\n"
-            + ("\n## Human decisions\n" + "".join(f"- {q['text']} → **{q['answer']}**\n" for q in answered) if answered else "")
+            + ("\n## Human decisions\n" + "".join(f"- {q['text']} → **{q['answer']}**\n" for q in answered) if answered and not s.get("resolution") else "")
             + ("\n## Open questions (agent proceeded on its assumption)\n" + "".join(f"- {q['text']} (assumed: {q['assumption']})\n" for q in open_q) if open_q else "")
             + f"\nTemporal workflow: `{rid}`. AI review follows as a comment; a human makes the final review and merges.\n\n🤖 Generated with OpenHands (Temporal blueprint)")
     out = sh(["gh", "pr", "create", "--repo", cfg["repo"], "--base", s["base_branch"], "--head", head,

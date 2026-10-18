@@ -36,7 +36,13 @@ uv venv .venv --python 3.12 && uv pip install --python .venv/bin/python -r requi
 
 ## Changing the workflow safely
 Running workflows replay their history against new code. Guard shape changes with `workflow.patched("<name>")`
-(see `decision-gate`, `decision-tests` in workflow.py). Without it, in-flight runs fail with a nondeterminism error.
+for small changes; for big ones register a new workflow type (`IgniteBlueprintV2`) and keep the old one frozen
+(`workflow_v1.py`) until its runs finish. Without either, in-flight runs fail with a nondeterminism error.
+
+## Where to look
+- Temporal UI -> workflow -> **User Metadata**: Summary (ticket), live Current Details (status, decisions, resolution, metrics).
+- Temporal UI -> **Timeline**: lifecycle chart with labelled stages and the human `answer` signal.
+- Dashboard (:8765): metrics per stage, Answer buttons, New run, Issue/Resolution side by side.
 
 ## Known limits (prototype)
 - Local qwen3:14b is the weak link: thin plans, ignores instructions (it skipped the decision until the test check forced it).

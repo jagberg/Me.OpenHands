@@ -57,14 +57,18 @@ function render(){
   tf.onchange=()=>{timeF=tf.value;render()};qf.oninput=()=>{q=qf.value;render();qf.focus();qf.setSelectionRange(q.length,q.length)};
   const rows=win.filter(r=>(statusF==="ALL"||st(r)===statusF)&&(JSON.stringify([r.id,r.pr_url,r.model,r.problem]).toLowerCase().includes(q.toLowerCase())));
   body.innerHTML=rows.map(r=>{const s=st(r),d=sum(r,"duration_s"),o=open.has(r.id);
-   return `<tr class="row" data-id="${esc(r.id)}"><td><span class="badge ${s}">${label(r)}</span></td><td><b>${r.engine==="temporal"?"IgniteBlueprint":"IgniteFixWorkflow"}</b><div class="id">${esc(r.id)}${r.current_stage&&s!=="COMPLETED"?" · "+esc(r.current_stage):""}</div></td>
+   return `<tr class="row" data-id="${esc(r.id)}"><td><span class="badge ${s}">${label(r)}</span></td><td><b>${esc(r.title||(r.engine==="temporal"?"IgniteBlueprint":"IgniteFixWorkflow"))}</b><div class="id">${esc(r.id)}${r.current_stage&&s!=="COMPLETED"?" · "+esc(r.current_stage):""}</div></td>
    <td class="hide">${esc((r.model||"").replace("ollama_chat/",""))}</td><td class="hide">local · ${r.engine==="temporal"?"temporal":"script"}</td><td class="hide">${esc(r.source||r.triggered_by||"cli")}</td>
    <td>${new Date(r.started).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}</td><td>${dur(d)}</td><td>${esc(pending(r))}</td><td>${o?"▾":"↗"}</td></tr>`+(o?detail(r):"")}).join("")||`<tr><td colspan="9" class="mut">No runs match.</td></tr>`;
   body.querySelectorAll("tr.row").forEach(e=>e.onclick=()=>{open.has(e.dataset.id)?open.delete(e.dataset.id):open.add(e.dataset.id);render()});
   upd.textContent="updated "+new Date().toLocaleTimeString();
 }
 function detail(r){const t=r.tests||{},p=x=>x?(x.passed?"PASS":"FAIL"):"–";
- return `<tr class="det"><td colspan="9"><div>${esc(r.problem)}</div>
+ return `<tr class="det"><td colspan="9">
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+  <div><b>Issue</b><pre style="white-space:pre-wrap;max-height:180px">${esc(r.problem)}</pre></div>
+  <div><b>Resolution</b><pre style="white-space:pre-wrap;max-height:180px">${esc(r.resolution||r.summary||(st(r)==="RUNNING"?"in progress…":"–"))}</pre></div>
+ </div>
  <div class="mini"><div><b>${fmt(sum(r,"llm_calls"))}</b><span>LLM calls</span></div><div><b>${fmt(sum(r,"prompt_tokens"))} / ${fmt(sum(r,"completion_tokens"))}</b><span>tokens in / out</span></div>
  <div><b>${fmt(sum(r,"tool_calls"))}</b><span>tool calls</span></div><div><b>$${sum(r,"cost_usd").toFixed(2)}</b><span>cost (local)</span></div><div><b>${p(t.before)} → ${p(t.after)}</b><span>tests</span></div>
  <div><b>${r.pr_url?`<a href="${esc(r.pr_url)}" target="_blank" rel="noopener">${esc(r.pr_state||"PR")} ↗</a>`:"–"}</b><span>pull request</span></div>

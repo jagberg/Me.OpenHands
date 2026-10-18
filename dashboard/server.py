@@ -25,13 +25,21 @@ class H(BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path.startswith("/api/runs"):
             runs = []
-            for p in sorted(RUNS.glob("*/run.json"), reverse=True):
+            try:  # v2 blueprint runs live in Temporal only
+                import asyncio
+                sys.path.insert(0, str(HERE.parent / "blueprint"))
+                import worker
+                runs = asyncio.run(worker.runs())
+            except Exception as e:
+                runs = [{"id": "temporal", "title": "Temporal unreachable", "status": "unknown", "started": "", "error": str(e)}]
+            for p in sorted(RUNS.glob("*/run.json"), reverse=True):  # older runs (script pipeline, blueprint v1)
                 try:
                     r = json.loads(p.read_text())
                     r["pr_state"] = pr_state(r["pr_url"]) if r.get("pr_url") else None
                     runs.append(r)
                 except ValueError:
                     pass  # mid-write; next poll will get it
+            runs.sort(key=lambda r: r.get("started") or "", reverse=True)
             body, ctype = json.dumps(runs).encode(), "application/json"
         elif self.path in ("/", "/index.html"):
             body, ctype = (HERE / "index.html").read_bytes(), "text/html; charset=utf-8"
