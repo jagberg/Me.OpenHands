@@ -1,0 +1,233 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ignite Blueprint v1 vs v2</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: single reading column (max 1040px); each section = one difference, chart or table first, one-line takeaway after. */
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --fg:#1b1f27; --muted:#5b6474; --line:#dde1e8;
+  --accent:#4b4fd1; --waste:#c2410c; --work:#0f766e; --human:#7c3aed; --warn-bg:#fff4e6; --ok-bg:#e6f6f3; --human-bg:#f1eafe;
+  --display:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12141a; --surface:#1a1d25; --fg:#e7e9ee; --muted:#9aa3b2; --line:#2b303b;
+  --accent:#8f93ff; --waste:#fb923c; --work:#2dd4bf; --human:#c4a7ff; --warn-bg:#2a1e14; --ok-bg:#12302c; --human-bg:#251c3a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12141a; --surface:#1a1d25; --fg:#e7e9ee; --muted:#9aa3b2; --line:#2b303b;
+  --accent:#8f93ff; --waste:#fb923c; --work:#2dd4bf; --human:#c4a7ff; --warn-bg:#2a1e14; --ok-bg:#12302c; --human-bg:#251c3a; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:15px/1.55 var(--body)}
+.wrap{max-width:1040px;margin:0 auto;padding-block:32px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:40px}
+h1{font:700 clamp(26px,4vw,36px)/1.15 var(--display);margin:0;text-wrap:balance}
+h2{font:600 21px/1.25 var(--display);margin:0;text-wrap:balance}
+.eyebrow{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{color:var(--muted);max-width:68ch;margin:0}
+section{display:grid;gap:14px;min-width:0}
+.take{margin:0;max-width:72ch}
+.take b{color:var(--fg)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+.num{font:600 34px/1 var(--display);font-variant-numeric:tabular-nums}
+.numlabel{font:500 12px var(--mono);color:var(--muted)}
+.stats{display:flex;gap:28px;flex-wrap:wrap;align-items:flex-end}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font:500 12px var(--mono);color:var(--muted)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+svg text{fill:var(--muted);font:500 11px var(--mono)}
+.chart{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tbl{overflow-x:auto}
+.pill{display:inline-block;font:500 11px var(--mono);padding:2px 8px;border-radius:99px;white-space:nowrap}
+.yes{background:var(--ok-bg);color:var(--work)}.part{background:var(--warn-bg);color:var(--waste)}.no{background:transparent;color:var(--muted);border:1px solid var(--line)}
+.flow{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.step{font:500 12px var(--mono);padding:6px 9px;border-radius:6px;border:1px solid var(--line);background:var(--surface)}
+.step.det{border-style:dashed}
+.step.agent{border-color:var(--accent);color:var(--accent)}
+.step.human{background:var(--human-bg);border-color:var(--human);color:var(--human);font-weight:600}
+.arrow{color:var(--muted);font:12px var(--mono)}
+figure{margin:0;display:grid;gap:8px}
+figure img{border:1px solid var(--line);border-radius:8px;display:block}
+figcaption{font:500 12px var(--mono);color:var(--muted)}
+.where{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr));gap:12px}
+.where div{border-top:3px solid var(--accent);padding-top:10px}
+.where h3{font:600 15px var(--display);margin:0 0 4px}
+.where p{margin:0;color:var(--muted);font-size:14px}
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <div class="eyebrow">Temporal blueprint · local prototype · runs 3 and 4</div>
+    <h1>What changed between blueprint v1 and v2</h1>
+    <p class="lede">The same ticket ran through both versions. v2 records only real work in Temporal, writes an issue and resolution summary, and labels every stage. Numbers come from the Temporal event history of each run.</p>
+  </header>
+
+  <section>
+    <div class="eyebrow">1 · Workflow history</div>
+    <h2>Three quarters of v1's history was bookkeeping</h2>
+    <div class="panel" style="display:grid;gap:16px">
+      <div class="stats">
+        <div><div class="num">445 → 99</div><div class="numlabel">history events per run</div></div>
+        <div><div class="num">60 → 15</div><div class="numlabel">activities per run</div></div>
+      </div>
+      <div class="legend">
+        <span><i class="sw" style="background:var(--work)"></i>real work (agents, tests, PR)</span>
+        <span><i class="sw" style="background:var(--waste)"></i>dashboard saves (write_run)</span>
+        <span><i class="sw" style="background:var(--human)"></i>PR state checks</span>
+        <span><i class="sw" style="background:var(--muted)"></i>separate question checks</span>
+      </div>
+      <div class="chart"><svg id="bars" viewBox="0 0 760 132" width="100%" role="img" aria-label="Activities per run: v1 60, v2 15"></svg></div>
+    </div>
+    <p class="take">v1 saved state to a file for the dashboard after every step and checked a separate question file after every stage. <b>v2 drops both</b>: the dashboard asks Temporal for the state directly, and each stage reports its own question.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">2 · Waiting for a human</div>
+    <h2>History growth while a PR waits for review</h2>
+    <div class="panel" style="display:grid;gap:12px">
+      <div class="legend">
+        <span><i class="sw" style="background:var(--waste)"></i>v1 · checks GitHub every 60 s</span>
+        <span><i class="sw" style="background:var(--work)"></i>v2 · backs off 1 → 2 → 4 → 8 → 15 min</span>
+      </div>
+      <div class="chart"><svg id="growth" viewBox="0 0 760 300" width="100%" role="img" aria-label="Estimated history events over 24 hours of PR review: v1 about 12,000, v2 about 900"></svg></div>
+    </div>
+    <p class="take">Estimate, about 8 events per PR check. After a day in review, <b>v1 reaches roughly 12,000 events and v2 roughly 900</b>. A GitHub webhook that signals the workflow on merge would remove polling entirely in production.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">3 · The lifecycle</div>
+    <h2>Where agents, code and humans each act</h2>
+    <div class="panel" style="display:grid;gap:12px">
+      <div class="flow" aria-label="Blueprint steps">
+        <span class="step det">setup</span><span class="arrow">→</span>
+        <span class="step agent">brief</span><span class="arrow">→</span>
+        <span class="step det">decision gate</span><span class="arrow">→</span>
+        <span class="step human">human answers</span><span class="arrow">→</span>
+        <span class="step agent">plan</span><span class="arrow">→</span>
+        <span class="step agent">build</span><span class="arrow">→</span>
+        <span class="step det">tests + decision tests</span><span class="arrow">→</span>
+        <span class="step agent">eng · sec · QA</span><span class="arrow">→</span>
+        <span class="step det">validate</span><span class="arrow">→</span>
+        <span class="step det">open PR</span><span class="arrow">→</span>
+        <span class="step agent">AI review</span><span class="arrow">→</span>
+        <span class="step human">human merges</span>
+      </div>
+      <div class="legend">
+        <span><i class="sw" style="border:1px dashed var(--muted)"></i>deterministic code</span>
+        <span><i class="sw" style="border:1px solid var(--accent)"></i>OpenHands agent</span>
+        <span><i class="sw" style="background:var(--human)"></i>human gate</span>
+      </div>
+    </div>
+    <p class="take">Unchanged between versions. The two purple steps are the only places a person is needed; the dashed steps are plain code the model cannot skip.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">4 · Issue and resolution</div>
+    <h2>The summary now appears in three places</h2>
+    <div class="where">
+      <div><h3>Temporal UI</h3><p>User Metadata tab: ticket as the summary, live details with status, decisions, resolution and metrics.</p></div>
+      <div><h3>RunView</h3><p>Issue and Resolution side by side at the top of each run.</p></div>
+      <div><h3>Pull request</h3><p>Resolution is the PR body: root cause, change, files, decisions applied, checks, review verdicts.</p></div>
+    </div>
+    <p class="take">v1 had none of these. The only summary was the build agent's one-line message inside the dashboard detail.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">5 · The two dashboards</div>
+    <h2>Temporal UI is stock; RunView is ours</h2>
+    <div class="panel tbl">
+      <table>
+        <thead><tr><th>Need</th><th>Temporal UI · :8233 · stock</th><th>RunView · :8765 · custom</th></tr></thead>
+        <tbody>
+          <tr><td>Current state of each run</td><td><span class="pill yes">yes</span> status, pending activities</td><td><span class="pill yes">yes</span> status tiles, pending column</td></tr>
+          <tr><td>Lifecycle view</td><td><span class="pill yes">yes</span> Timeline with labelled stages</td><td><span class="pill part">partial</span> stage table, event list</td></tr>
+          <tr><td>Issue and resolution</td><td><span class="pill yes">yes</span> User Metadata (v2)</td><td><span class="pill yes">yes</span> side by side (v2)</td></tr>
+          <tr><td>Tokens, time, LLM calls per stage</td><td><span class="pill no">no</span> not without a fork</td><td><span class="pill yes">yes</span></td></tr>
+          <tr><td>Answer a human question</td><td><span class="pill part">raw JSON</span> "Send a Signal"</td><td><span class="pill yes">yes</span> Answer button</td></tr>
+          <tr><td>Start a run</td><td><span class="pill part">raw JSON</span> "Start Workflow"</td><td><span class="pill yes">yes</span> New run</td></tr>
+          <tr><td>Retry, reset, cancel, full history</td><td><span class="pill yes">yes</span></td><td><span class="pill no">no</span> links to Temporal</td></tr>
+          <tr><td>Customisation</td><td>Summary and details, search attributes as columns, saved views</td><td>Anything: about 240 lines of our code</td></tr>
+          <tr><td>Who looks after it</td><td>Temporal (upgrade the image)</td><td>Us</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="take">Suggested split: <b>Temporal UI for whoever operates the system</b>, RunView for whoever answers questions and reads metrics.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">6 · Screens</div>
+    <h2>Run 4 in each dashboard</h2>
+    <div class="grid2">
+      <figure><img src="temporal-metadata.png" alt="Temporal UI User Metadata tab showing summary, issue, decisions and resolution for run 4"><figcaption>Temporal UI · User Metadata</figcaption></figure>
+      <figure><img src="temporal-timeline.png" alt="Temporal UI Timeline tab showing labelled stages for run 4 and the human answer signal"><figcaption>Temporal UI · Timeline</figcaption></figure>
+    </div>
+    <figure><img src="runview.png" alt="RunView dashboard with run 4 expanded showing issue, resolution, metrics and the answered question"><figcaption>RunView · run 4 expanded</figcaption></figure>
+  </section>
+</div>
+
+<script>
+(function(){
+  const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (t, a, p) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); p && p.appendChild(e); return e; };
+  const txt = (p, x, y, s, a) => { const t = el("text", Object.assign({x, y}, a || {}), p); t.textContent = s; return t; };
+
+  // 1 · stacked activity bars (counts from Temporal history of runs 3 and 4)
+  function bars(){
+    const svg = document.getElementById("bars"); svg.innerHTML = "";
+    const rows = [
+      {label: "v1 · run 3", parts: [["--work", 14], ["--waste", 23], ["--human", 16], ["--muted", 7]]},
+      {label: "v2 · run 4", parts: [["--work", 14], ["--human", 1]]},
+    ];
+    const x0 = 96, w = 540, scale = w / 60;
+    [0, 15, 30, 45, 60].forEach(v => {
+      const x = x0 + v * scale;
+      el("line", {x1: x, x2: x, y1: 8, y2: 104, stroke: css("--line"), "stroke-width": 1}, svg);
+      txt(svg, x, 124, String(v), {"text-anchor": "middle"});
+    });
+    rows.forEach((r, i) => {
+      const y = 16 + i * 46; let x = x0;
+      txt(svg, 0, y + 20, r.label);
+      r.parts.forEach(([c, n]) => {
+        el("rect", {x, y, width: n * scale, height: 30, rx: 3, fill: css(c)}, svg);
+        if (n * scale > 22) txt(svg, x + n * scale / 2, y + 20, String(n), {"text-anchor": "middle", style: "fill:" + css("--bg") + ";font-weight:600"});
+        x += n * scale;
+      });
+      txt(svg, x + 8, y + 20, (r.parts.reduce((s, p) => s + p[1], 0)) + " activities", {style: "fill:" + css("--fg")});
+    });
+  }
+
+  // 2 · history growth over 24h of PR review (estimate: ~8 events per check)
+  function growth(){
+    const svg = document.getElementById("growth"); svg.innerHTML = "";
+    const v1 = h => 445 + 8 * 60 * h;
+    const checks = T => { const early = [0, 1, 3, 7, 15].filter(t => t <= T).length; return T < 30 ? early : 5 + Math.floor((T - 15) / 15); };
+    const v2 = h => 99 + 8 * (checks(h * 60) - 1);
+    const L = 64, R = 700, T = 14, B = 260, ymax = 12000;
+    const X = h => L + (h / 24) * (R - L), Y = v => B - (v / ymax) * (B - T);
+    [0, 3000, 6000, 9000, 12000].forEach(v => {
+      el("line", {x1: L, x2: R, y1: Y(v), y2: Y(v), stroke: css("--line"), "stroke-width": 1}, svg);
+      txt(svg, L - 8, Y(v) + 4, v.toLocaleString(), {"text-anchor": "end"});
+    });
+    [0, 6, 12, 18, 24].forEach(h => txt(svg, X(h), B + 20, h + "h", {"text-anchor": "middle"}));
+    txt(svg, (L + R) / 2, B + 38, "hours waiting for PR review", {"text-anchor": "middle"});
+    const path = (f, c, area) => {
+      let d = ""; for (let m = 0; m <= 24 * 60; m += 5) { const h = m / 60; d += (m ? "L" : "M") + X(h).toFixed(1) + "," + Y(f(h)).toFixed(1); }
+      if (area) el("path", {d: d + `L${X(24)},${B}L${X(0)},${B}Z`, fill: c, opacity: .12}, svg);
+      el("path", {d, fill: "none", stroke: c, "stroke-width": 2.5}, svg);
+      el("circle", {cx: X(24), cy: Y(f(24)), r: 4, fill: c}, svg);
+      txt(svg, X(24) + 8, Y(f(24)) + 4, "≈" + (Math.round(f(24) / 10) * 10).toLocaleString(), {style: "fill:" + c + ";font-weight:600"});
+    };
+    path(v1, css("--waste"), true);
+    path(v2, css("--work"), false);
+  }
+
+  function draw(){ bars(); growth(); }
+  draw();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", draw);
+  new MutationObserver(draw).observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme"]});
+})();
+</script>
