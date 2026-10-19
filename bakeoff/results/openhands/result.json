@@ -1,0 +1,1 @@
+{"harness": "openhands", "skills_loaded": ["agents", "qa-review", "ignite-plan", "ignite-build", "ignite-brief"], "rounds": [{"round": 1, "seconds": 239, "question": null, "final": ""}], "llm_calls": 80, "prompt_tokens": 592360, "completion_tokens": 3860}
