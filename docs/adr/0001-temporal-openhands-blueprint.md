@@ -1,6 +1,8 @@
 # ADR 0001: Orchestrate coding agents with Temporal + the OpenHands SDK
 
-- Status: accepted (local prototype, 2026-10-18); revisit before the work-repo rollout
+- Status: accepted (local prototype, 2026-10-18); revisit before the work-repo rollout.
+  Under review since 2026-10-19: [ADR 0005](0005-process-in-prompts-agent-harness.md) (proposed) would move stage order
+  out of code and into prompts inside an agent harness.
 - Date: 2026-10-18
 
 ## Context

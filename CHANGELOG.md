@@ -62,3 +62,40 @@ UI, RunView and the PR body.
 
 **Decision:** See ADR 0004. Comparison page and screenshots in `docs/visuals/`.
 **Supersedes:** n/a
+
+## 2026-10-19 - Repository made public
+
+**Decision:** The owner made `jagberg/Me.OpenHands` public.
+**Reasoning:** Not recorded (owner's choice). A history audit the same day found no secrets, local paths, hostnames or
+work email; known exposures are the personal commit email (already public via other repos), links to the private
+`ai-agent-trial-sandbox` repo and private artifact pages, and no LICENSE file (all rights reserved by default).
+**Trade-off accepted:** Anyone can read the history, including old `runs/*.json` metric files from the first commit.
+**Supersedes:** n/a
+
+## 2026-10-19 - Setup visual with conceptual and logical views
+
+**Decision:** Add `docs/visuals/setup-steps.html`: six-layer conceptual view, per-component configuration (logical
+view), interfaces between components, and eight setup steps including the three ways to send a human answer.
+**Supersedes:** n/a
+
+## 2026-10-19 - Coded stage order under review
+
+**Decision:** Propose moving the AI-DLC from coded workflow stages into prompts inside an agent harness (ADR 0005,
+proposed); ADR 0001 is marked under review, unchanged otherwise.
+**Reasoning:** Work loops (QA finds a gap, a human re-plans, rebuild). The owner does not want to rebuild an agent
+harness in workflow code. The blueprint also cannot go back from QA today.
+**Trade-off accepted:** Process reliability moves onto the model; qwen3:14b is not good enough to judge it.
+**Alternatives rejected:** Add a QA -> brief rewind to the blueprint: still owns orchestration.
+**Supersedes:** n/a yet (ADR 0005 is proposed)
+
+## 2026-10-19 - Harness bake-off: OpenHands SDK vs Codex SDK
+
+**Decision:** Run both on the same prompt-defined process, fixture and local model before choosing; Claude Agent SDK
+deferred until the owner is ready to use a Claude key.
+**Reasoning:** Codex is open source (Apache-2.0) with built-in Ollama and Bedrock providers; OpenHands is MIT and already
+proven here. Both can be tested at $0.
+**Result:** Wiring works on both (~30 lines of glue, repo skills load, token metrics); neither followed the process,
+looped back from QA or asked the human on qwen3:14b, so the harnesses are not ranked yet. Full table in `README.md`,
+details in `bakeoff/README.md`.
+**Trade-off accepted:** Single run per harness on a weak model; conclusions are about wiring, not quality.
+**Supersedes:** n/a

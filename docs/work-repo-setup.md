@@ -1,6 +1,10 @@
 # Setting this up on a work repo
 
 A checklist for moving the prototype from the toy repo to a real (work) repository. Read `docs/adr/` first.
+
+> **Under review (2026-10-19):** this checklist assumes the coded Temporal blueprint (ADR 0001). ADR 0005 (proposed)
+> would replace it with a prompt-defined process in an agent harness; steps 4 (skills), 6 (intake) and 7 (dashboard)
+> carry over, steps 1-2 and 5 would change. Check ADR 0005's status before following this.
 Written 2026-10-18; items marked **untested** were not exercised in the prototype.
 
 ## 0. Decide before you start
