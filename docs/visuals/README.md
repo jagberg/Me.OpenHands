@@ -3,6 +3,7 @@
 | File | What it shows |
 |---|---|
 | `blueprint-v1-vs-v2.html` | Comparison page: history size, waiting cost, lifecycle, summaries, the two dashboards. Open in a browser. Also published (private) at https://claude.ai/artifact/T9ynthgNQwziayQutNfxFM |
+| `setup-steps.html` | Conceptual view (six layers), logical view (what is configured in each component, how they connect), then setup in 8 steps: Temporal, worker and model, starting a run, skills, prompt layers, metrics, human answers, PR. Open in a browser; diagrams render via the Mermaid script from jsDelivr (needs internet). Published (private) at https://claude.ai/artifact/PXfWScVJxBcLf1he7k6AFR |
 | `screens/temporal-workflow-list.png` | Temporal UI (stock) - workflow list |
 | `screens/temporal-user-metadata.png` | Temporal UI - User Metadata tab: summary, live issue/decisions/resolution (v2) |
 | `screens/temporal-timeline.png` | Temporal UI - Timeline: labelled stages and the human `answer` signal (v2) |

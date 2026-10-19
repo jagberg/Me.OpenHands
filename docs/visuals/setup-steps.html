@@ -1,0 +1,348 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ignite Factory Setup</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column; each step = number rail + what/where/how, code under it; diagrams where flow matters (overview, HITL). */
+:root{
+  --bg:#f5f6f8; --surface:#ffffff; --fg:#1b1f27; --muted:#5b6474; --line:#dde1e8; --code:#eef0f4;
+  --accent:#4b4fd1; --det:#475569; --agent:#4b4fd1; --human:#7c3aed; --ok:#0f766e; --ok-bg:#e6f6f3; --warn:#b45309; --warn-bg:#fff4e6; --human-bg:#f1eafe;
+  --display:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,"SFMono-Regular",Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12141a; --surface:#1a1d25; --fg:#e7e9ee; --muted:#9aa3b2; --line:#2b303b; --code:#232733;
+  --accent:#8f93ff; --det:#a3b1c6; --agent:#8f93ff; --human:#c4a7ff; --ok:#2dd4bf; --ok-bg:#12302c; --warn:#fbbf24; --warn-bg:#2a2210; --human-bg:#251c3a; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#12141a; --surface:#1a1d25; --fg:#e7e9ee; --muted:#9aa3b2; --line:#2b303b; --code:#232733;
+  --accent:#8f93ff; --det:#a3b1c6; --agent:#8f93ff; --human:#c4a7ff; --ok:#2dd4bf; --ok-bg:#12302c; --warn:#fbbf24; --warn-bg:#2a2210; --human-bg:#251c3a; color-scheme:dark}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 var(--display)}
+.wrap{max-width:980px;margin:0 auto;padding-block:32px 72px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:grid;gap:44px}
+h1{font:700 clamp(28px,4.4vw,40px)/1.1 var(--display);margin:0;text-wrap:balance}
+h2{font:600 22px/1.25 var(--display);margin:0;text-wrap:balance}
+h3{font:600 15px/1.3 var(--display);margin:0}
+p{margin:0;max-width:70ch}
+.eyebrow{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.lede{color:var(--muted)}
+a{color:var(--accent)}
+code{font:13px var(--mono);background:var(--code);padding:1px 5px;border-radius:4px}
+pre{font:12.5px/1.55 var(--mono);background:var(--code);border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:0;overflow-x:auto;white-space:pre}
+pre.mermaid{background:var(--surface);white-space:pre;text-align:center}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0;display:grid;gap:12px}
+.step{display:grid;grid-template-columns:44px minmax(0,1fr);gap:16px}
+.n{font:600 15px/1 var(--mono);width:36px;height:36px;border-radius:50%;display:grid;place-items:center;border:1.5px solid var(--accent);color:var(--accent);background:var(--surface)}
+.step.human .n{border-color:var(--human);color:var(--human);background:var(--human-bg)}
+.body{display:grid;gap:12px;min-width:0}
+.where{font:500 12px var(--mono);color:var(--muted)}
+.where a{color:var(--muted)}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
+.tag{display:inline-block;font:500 11px var(--mono);padding:2px 8px;border-radius:99px;white-space:nowrap;vertical-align:1px}
+.oob{background:var(--ok-bg);color:var(--ok)}.ours{background:var(--warn-bg);color:var(--warn)}.hum{background:var(--human-bg);color:var(--human)}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:500 11px var(--mono);letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.tbl{overflow-x:auto}
+.layers{display:grid;gap:6px}
+.layer{display:grid;grid-template-columns:150px minmax(0,1fr);gap:12px;align-items:start;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.layer b{font:600 13px var(--display)}
+.layer span{color:var(--muted);font-size:14px}
+.note{border-left:3px solid var(--warn);padding:6px 12px;color:var(--muted);font-size:14px}
+.views{display:flex;gap:8px;flex-wrap:wrap}
+.views a{font:500 12px var(--mono);text-decoration:none;color:var(--fg);border:1px solid var(--line);background:var(--surface);padding:6px 12px;border-radius:99px}
+.views a:hover,.views a:focus-visible{border-color:var(--accent);color:var(--accent);outline:none}
+.cake{display:grid;gap:6px;order:2}
+.cakehead{display:none}
+.lay{display:grid;grid-template-columns:170px minmax(0,1.6fr) minmax(0,1fr) minmax(0,.9fr);gap:14px;align-items:start;background:var(--surface);border:1px solid var(--line);border-left:5px solid var(--kc);border-radius:8px;padding:12px 14px}
+.ln{font:600 15px var(--display);color:var(--kc)}
+.lr{font-size:14px}
+.lb{font:500 12px var(--mono);color:var(--fg)}
+.lw{font:500 12px var(--mono);color:var(--muted)}
+.lb::before{content:"Built on ";color:var(--muted)}
+.lw::before{content:"Changed by ";color:var(--muted)}
+.k-in{--kc:var(--det)}.k-orch{--kc:var(--ok)}.k-agent{--kc:var(--agent)}.k-skill{--kc:var(--warn)}.k-guard{--kc:var(--det)}.k-human{--kc:var(--human)}
+.zones{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px;align-items:start}
+.zone{border:1.5px dashed var(--line);border-radius:12px;padding:12px;display:grid;gap:10px;min-width:0}
+.zl{font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.card{background:var(--surface);border:1px solid var(--line);border-top:3px solid var(--kc);border-radius:8px;padding:12px 14px;min-width:0}
+.card h3{margin-bottom:8px}
+.file{font:500 11px var(--mono);color:var(--muted);font-weight:500;margin-left:6px}
+.c-orch{--kc:var(--ok)}.c-agent{--kc:var(--agent)}.c-skill{--kc:var(--warn)}.c-guard{--kc:var(--det)}.c-human{--kc:var(--human)}
+dl{display:grid;grid-template-columns:minmax(84px,auto) minmax(0,1fr);gap:4px 10px;margin:0;font-size:13.5px}
+dt{font:500 11.5px/1.7 var(--mono);color:var(--muted)}
+dd{margin:0;min-width:0;overflow-wrap:anywhere}
+dd code{font-size:12px}
+@media (max-width:760px){.lay{grid-template-columns:1fr;gap:4px}}
+@media (max-width:560px){.layer{grid-template-columns:1fr}.step{grid-template-columns:1fr}.n{width:32px;height:32px}}
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:12px">
+    <div class="eyebrow">Me.OpenHands · Temporal + OpenHands SDK · local first, Bedrock later</div>
+    <h1>How a ticket becomes a reviewed PR</h1>
+    <p class="lede">What you set up, where each piece lives in the repo, and how a person steps in. File links point at <a href="https://github.com/jagberg/Me.OpenHands" target="_blank" rel="noopener">github.com/jagberg/Me.OpenHands</a>. Jira intake is out of scope here; a ticket arrives as a title and description.</p>
+  </header>
+
+  <nav class="views" aria-label="Views on this page">
+    <a href="#conceptual">Conceptual view</a><a href="#logical">Logical view</a><a href="#steps">Setup steps</a>
+  </nav>
+
+  <section id="conceptual" style="display:grid;gap:14px">
+    <div class="eyebrow">View 1 · Conceptual</div>
+    <h2>Six layers, each with one job</h2>
+    <p class="lede">What each part of the factory is responsible for, independent of the tools. A ticket moves down through the layers; people sit at the two gates.</p>
+    <div class="cake">
+      <div class="lay k-in"><div class="ln">Intake</div><div class="lr">Turns a request into a ticket: title, description, which repo and how to test it.</div><div class="lb">start.py · RunView · HTTP (Jira later)</div><div class="lw">You, per run</div></div>
+      <div class="lay k-orch"><div class="ln">Orchestration</div><div class="lr">Runs the steps in a fixed order, remembers every run's state, retries failures, waits for people without using compute.</div><div class="lb">Temporal (Docker)</div><div class="lw">Rarely; it's infrastructure</div></div>
+      <div class="lay k-agent"><div class="ln">Agent work</div><div class="lr">Reads code, writes the brief and plan, changes code, reviews it. One agent conversation per stage.</div><div class="lb">OpenHands SDK + model</div><div class="lw">Model choice only</div></div>
+      <div class="lay k-skill"><div class="ln">Skills and prompts</div><div class="lr">Tells each stage what to do and what file to produce. This is where your AI-DLC lives.</div><div class="lb">skills/*.md</div><div class="lw">You, often</div></div>
+      <div class="lay k-guard"><div class="ln">Guardrails</div><div class="lr">Plain-code checks the model cannot skip: tests pass, protected files untouched, every human decision pinned by a test.</div><div class="lb">workflow.py · activities.py</div><div class="lw">When rules change</div></div>
+      <div class="lay k-human"><div class="ln">Humans and visibility</div><div class="lr">People answer decisions and merge PRs. Dashboards show where every run is and what it cost.</div><div class="lb">RunView · Temporal UI · GitHub</div><div class="lw">Answers: anyone named; dashboards: rarely</div></div>
+    </div>
+  </section>
+
+  <section id="logical" style="display:grid;gap:14px">
+    <div class="eyebrow">View 2 · Logical</div>
+    <h2>What is set up in each component</h2>
+    <p class="lede">Grouped by where it runs. Every value below is the current prototype configuration.</p>
+
+    <div class="zones">
+      <div class="zone">
+        <div class="zl">Docker</div>
+        <div class="card c-orch"><h3>Temporal server</h3>
+          <dl>
+            <dt>Image</dt><dd>temporalio/temporal, dev server</dd>
+            <dt>Ports</dt><dd>7233 gRPC · 8233 UI (127.0.0.1 only)</dd>
+            <dt>Storage</dt><dd>SQLite in volume <code>temporal-data</code></dd>
+            <dt>Namespace</dt><dd>default</dd>
+            <dt>Task queue</dt><dd>ignite</dd>
+            <dt>Workflow types</dt><dd>IgniteBlueprintV2 · IgniteBlueprint (v1, frozen)</dd>
+          </dl></div>
+        <div class="card c-human"><h3>Temporal UI</h3>
+          <dl>
+            <dt>Shows</dt><dd>workflow list, Timeline, Event History</dd>
+            <dt>User Metadata</dt><dd>summary = ticket title, live details = status, decisions, resolution, metrics</dd>
+            <dt>Actions</dt><dd>Send a Signal, cancel, reset, terminate</dd>
+          </dl></div>
+      </div>
+
+      <div class="zone">
+        <div class="zl">Worker process (host or container)</div>
+        <div class="card c-orch"><h3>Blueprint workflow <span class="file">workflow.py</span></h3>
+          <dl>
+            <dt>Stage order</dt><dd>brief → decision gate → plan → build → eng → sec → QA → validate → PR → AI review → wait for merge</dd>
+            <dt>Signal</dt><dd><code>answer(qid, text)</code></dd>
+            <dt>Query</dt><dd><code>state</code> (full run record)</dd>
+            <dt>Build gate</dt><dd>up to 3 attempts until tests and decision tests pass</dd>
+            <dt>PR wait</dt><dd>checks at 1, 2, 4, 8, then every 15 min</dd>
+          </dl></div>
+        <div class="card c-guard"><h3>Activities <span class="file">activities.py</span></h3>
+          <dl>
+            <dt>Plain code</dt><dd>setup_workspace · run_tests · decision_tests · collect · open_pr · post_review · pr_state</dd>
+            <dt>LLM</dt><dd>agent_stage (40 min, 2 attempts) · decision_gate (one JSON call)</dd>
+            <dt>Workspace</dt><dd><code>runs/&lt;id&gt;/workspace</code>, branch <code>ai/&lt;id&gt;</code></dd>
+            <dt>Env</dt><dd>LLM_MODEL · LLM_BASE_URL · GIT_BASE · DATA_DIR · MAX_ACTIVITIES</dd>
+          </dl></div>
+        <div class="card c-agent"><h3>OpenHands agent <span class="file">agent_stage()</span></h3>
+          <dl>
+            <dt>Tools</dt><dd>terminal, file_editor (no browser)</dd>
+            <dt>System prompt</dt><dd>stock <code>system_prompt.j2</code></dd>
+            <dt>Skill loading</dt><dd>user and public skills off</dd>
+            <dt>Limits</dt><dd>40 iterations · 900 s LLM timeout · 4,096 output tokens</dd>
+            <dt>Metrics</dt><dd><code>conversation_stats</code>: tokens, latency, cost</dd>
+          </dl></div>
+        <div class="card c-skill"><h3>Skills and prompts <span class="file">skills/*.md</span></h3>
+          <dl>
+            <dt>Files</dt><dd>ignite-brief · ignite-plan · ignite-build · engineering-review · security-review · qa-review · ai-code-review</dd>
+            <dt>Prompt</dt><dd>skill + context + decisions so far + open questions + ticket</dd>
+            <dt>Outputs</dt><dd><code>.ignite/&lt;stage&gt;.md</code> (PASS / CONCERNS) · <code>test_decisions.py</code> · <code>.ignite/QUESTION.md</code></dd>
+          </dl></div>
+      </div>
+
+      <div class="zone">
+        <div class="zl">Services (host and external)</div>
+        <div class="card c-human"><h3>RunView <span class="file">dashboard/</span></h3>
+          <dl>
+            <dt>Port</dt><dd>8765, 127.0.0.1 only, no login</dd>
+            <dt>Reads</dt><dd>Temporal: list workflows, <code>state</code> query, results</dd>
+            <dt>Endpoints</dt><dd>GET /api/runs · POST /api/briefs · POST /api/runs/&lt;id&gt;/answer</dd>
+            <dt>Shows</dt><dd>status tiles, issue and resolution, stage metrics, Answer box, New run</dd>
+          </dl></div>
+        <div class="card c-agent"><h3>Model</h3>
+          <dl>
+            <dt>Now</dt><dd>Ollama <code>qwen3-14b-oh</code> (qwen3:14b, 32k context, reasoning off)</dd>
+            <dt>Later</dt><dd>Bedrock: <code>LLM_MODEL=bedrock/&lt;id&gt;</code>, AWS role (untested)</dd>
+          </dl></div>
+        <div class="card c-guard"><h3>GitHub</h3>
+          <dl>
+            <dt>Repo</dt><dd>per run <code>cfg.repo</code></dd>
+            <dt>Branches</dt><dd>head <code>ai/&lt;id&gt;</code> · base default branch, or a throwaway copy</dd>
+            <dt>Writes</dt><dd>push, PR with resolution, AI review comment</dd>
+            <dt>Auth</dt><dd>your gh login now · repo-scoped token later</dd>
+          </dl></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h3>How they connect</h3>
+      <pre class="mermaid">
+flowchart LR
+  IN["Intake<br/>start.py · RunView · HTTP"] -->|start_workflow| TS[("Temporal server")]
+  TS <-->|poll tasks, report results| WK["Worker<br/>workflow + activities"]
+  WK -->|send prompt, run tools| OH["OpenHands agent"]
+  OH -->|chat completions| MD["Model<br/>Ollama / Bedrock"]
+  WK -->|clone, push, gh pr| GH["GitHub"]
+  RV["RunView"] -->|list, query state| TS
+  HU(("Human")) -->|Answer| RV
+  RV -->|signal answer| TS
+  HU -->|review, merge| GH
+  UI["Temporal UI"] -->|read history| TS
+      </pre>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>From → to</th><th>Interface</th><th>What flows</th></tr></thead>
+          <tbody>
+            <tr><td>Intake → Temporal</td><td><code>client.start_workflow</code></td><td>title, brief, source, cfg (repo, workdir, test_cmd, protected)</td></tr>
+            <tr><td>Temporal ↔ Worker</td><td>task queue <code>ignite</code></td><td>workflow and activity tasks, results, run state</td></tr>
+            <tr><td>Worker → Agent</td><td>OpenHands SDK <code>Conversation</code></td><td>stage prompt; back: final message, metrics, question</td></tr>
+            <tr><td>Agent → Model</td><td>litellm (OpenAI-style chat)</td><td>prompts and tool calls; back: completions with token usage</td></tr>
+            <tr><td>Worker → GitHub</td><td>git over SSH/HTTPS, <code>gh</code> CLI</td><td>branches, PR body, review comment; back: PR state</td></tr>
+            <tr><td>RunView → Temporal</td><td>list, <code>state</code> query, workflow result</td><td>the run record shown on the dashboard</td></tr>
+            <tr><td>Human → Temporal</td><td><code>answer</code> signal via RunView, Temporal UI or CLI</td><td>question id and the decision</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <div id="steps" class="eyebrow" style="margin-bottom:-28px">Setup steps</div>
+
+  <section style="display:grid;gap:28px">
+    <h2>Setup and lifecycle, in order</h2>
+
+    <div class="step"><div class="n">1</div><div class="body">
+      <h3>Run Temporal in Docker</h3>
+      <p>One container: the Temporal dev server with its Web UI, saving to SQLite in a Docker volume so runs survive restarts.</p>
+      <pre>cd blueprint
+docker compose up -d temporal          # gRPC :7233, UI http://localhost:8233</pre>
+      <div class="where">Where: <a href="https://github.com/jagberg/Me.OpenHands/blob/main/blueprint/docker-compose.yml" target="_blank" rel="noopener">blueprint/docker-compose.yml</a> · production would use Temporal's Postgres deployment or Temporal Cloud</div>
+    </div></div>
+
+    <div class="step"><div class="n">2</div><div class="body">
+      <h3>Start the worker and choose the model</h3>
+      <p>The worker registers the workflow and its activities on the <code>ignite</code> task queue. The model is three environment variables; nothing else changes for Bedrock.</p>
+      <pre>uv venv .venv --python 3.12
+uv pip install --python .venv/bin/python -r requirements.txt   # openhands-sdk, openhands-tools, temporalio
+
+# local (today)                         # Bedrock (later, untested)
+LLM_MODEL=ollama_chat/qwen3-14b-oh      # LLM_MODEL=bedrock/&lt;model-id&gt;
+LLM_BASE_URL=http://localhost:11434     # LLM_BASE_URL=        (empty)
+                                        # AWS_REGION=…  creds from role/SSO, never a file
+.venv/bin/python worker.py</pre>
+      <div class="where">Where: <a href="https://github.com/jagberg/Me.OpenHands/blob/main/blueprint/worker.py" target="_blank" rel="noopener">worker.py</a> (registration) · <a href="https://github.com/jagberg/Me.OpenHands/blob/main/blueprint/activities.py" target="_blank" rel="noopener">activities.py</a> (MODEL, BASE_URL) · needs your git and gh login for PRs</div>
+    </div></div>
+
+    <div class="step"><div class="n">3</div><div class="body">
+      <h3>Create the issue (start a run)</h3>
+      <p>A run is one Temporal workflow. Three ways in, all ending in the same call:</p>
+      <div class="cols">
+        <div class="panel"><b>RunView</b><span class="where">"+ New run" button, title and description</span></div>
+        <div class="panel"><b>CLI</b><span class="where">.venv/bin/python start.py ../trials/TICKET.md</span></div>
+        <div class="panel"><b>HTTP (for Jira later)</b><span class="where">POST /api/briefs {title, brief, source}</span></div>
+      </div>
+      <pre>await client.start_workflow(
+    IgniteBlueprint.run,
+    {"title": title, "brief": brief, "source": "jira|cli|dashboard",
+     "cfg": {"repo": "org/repo", "workdir": ".", "test_cmd": "pytest -q",
+             "protected": ["test_calc.py"], "throwaway_base": False}},
+    id="ignite-20261019-093000", task_queue="ignite",
+    static_summary=title, static_details=brief)     # shows in the Temporal UI</pre>
+      <div class="where">Where: <code>start()</code> in worker.py · <code>cfg</code> is per run, so one worker can serve many repos</div>
+    </div></div>
+
+    <div class="step"><div class="n">4</div><div class="body">
+      <h3>Load the skills</h3>
+      <p>Each stage name in the workflow maps to one Markdown file. The agent stage reads that file and sends it as the task. OpenHands' own user and public skills are switched off so they don't flood the prompt.</p>
+      <pre>workflow.py   STAGES:  ignite-brief → ignite-plan → ignite-build → engineering-review → security-review → qa-review → ai-code-review
+skills/       ignite-brief.md  ignite-plan.md  ignite-build.md  engineering-review.md  security-review.md  qa-review.md  ai-code-review.md
+
+agent = Agent(llm=…, tools=[terminal, file_editor],
+              agent_context=AgentContext(load_user_skills=False, load_public_skills=False))</pre>
+      <p>To use your real skills: replace the files in <code>skills/</code> (keep the two output contracts in step 5), or add a stage by adding a file and a line in <code>workflow.py</code>.</p>
+      <div class="note">Native option, not used yet: the SDK's <code>load_project_skills(work_dir)</code> reads a repo's <code>.agents/skills/</code> folder and its <code>AGENTS.md</code>, and <code>AgentContext(skills=…)</code> passes them in. That would let the target repo carry its own ignite skills. Untested here.</div>
+    </div></div>
+
+    <div class="step"><div class="n">5</div><div class="body">
+      <h3>Set the prompts</h3>
+      <p>Every agent stage sends one message built from these layers, top to bottom:</p>
+      <div class="layers">
+        <div class="layer"><b>OpenHands system prompt</b><span><span class="tag oob">out of the box</span> stock <code>system_prompt.j2</code>, untouched: tools, safety, how to work.</span></div>
+        <div class="layer"><b>Stage skill</b><span><span class="tag ours">ours</span> <code>skills/&lt;stage&gt;.md</code>: what this stage does and the file it must write.</span></div>
+        <div class="layer"><b>Context</b><span><span class="tag ours">ours</span> working folder, test command, and any extra feedback (e.g. "tests still fail: …").</span></div>
+        <div class="layer"><b>Decisions so far</b><span><span class="tag hum">from humans</span> every answered question and its answer.</span></div>
+        <div class="layer"><b>Ticket</b><span>title and description from step 3.</span></div>
+      </div>
+      <p>Contracts the workflow depends on: reviews write <code>.ignite/&lt;name&gt;.md</code> with <code>PASS</code> or <code>CONCERNS</code>; the build adds one test per decision to <code>test_decisions.py</code>. The decision gate has its own short prompt (returns JSON) in <code>decision_gate()</code>.</p>
+      <div class="where">Where: <code>agent_stage()</code> and <code>decision_gate()</code> in activities.py · skills/*.md</div>
+    </div></div>
+
+    <div class="step"><div class="n">6</div><div class="body">
+      <h3>Define the metrics</h3>
+      <p>Most numbers come free. A few lifecycle numbers we compute from timestamps.</p>
+      <div class="panel tbl" style="padding:6px 10px">
+        <table>
+          <thead><tr><th>Metric</th><th>Source</th><th>Where you see it</th></tr></thead>
+          <tbody>
+            <tr><td>Tokens in / out, LLM calls, latency per call, cost</td><td><span class="tag oob">OpenHands SDK</span> <code>conversation_stats</code> (cost from litellm pricing; $0 on Ollama)</td><td>RunView stage table, Temporal summary</td></tr>
+            <tr><td>Run status, step timings, retries, full history</td><td><span class="tag oob">Temporal</span></td><td>Temporal UI Timeline and Event History</td></tr>
+            <tr><td>Tool calls, stage duration</td><td><span class="tag ours">ours</span> counted in <code>agent_stage()</code></td><td>RunView stage table</td></tr>
+            <tr><td>Time to PR, time waiting on humans</td><td><span class="tag ours">ours</span> from <code>pr_opened</code>, <code>asked_at</code>, <code>answered_at</code></td><td>RunView run detail</td></tr>
+            <tr><td>Checks (tests pass, protected files untouched, decisions pinned)</td><td><span class="tag ours">ours</span> <code>collect()</code> + workflow</td><td>RunView, Temporal summary, PR body</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Adding one: return a new field from an activity (it lands in that stage's record), then show it in <code>dashboard/index.html</code> or in <code>details()</code> in workflow.py for the Temporal UI.</p>
+    </div></div>
+
+    <div class="step human"><div class="n">7</div><div class="body">
+      <h3>A human answers a question</h3>
+      <p>After the brief, the decision gate lists open decisions. Each becomes a blocking question and the workflow parks (no compute) until it gets an <code>answer</code> signal. Agents can also ask during any stage by writing <code>.ignite/QUESTION.md</code>.</p>
+      <pre class="mermaid">
+sequenceDiagram
+  participant WF as Workflow
+  participant A as Agent / gate
+  participant RV as RunView
+  actor H as Human
+  A->>WF: question q1 (blocking)
+  WF->>WF: status = awaiting_decision, wait
+  RV->>WF: query state (every 3s)
+  RV-->>H: shows q1 with an Answer box
+  H->>RV: "return 0 for an empty list"
+  RV->>WF: signal answer("q1", "return 0…")
+  WF->>A: plan, build run with the decision
+  A->>WF: test_decisions.py pins it, checks pass
+      </pre>
+      <p>Three ways to send the answer, all the same signal:</p>
+      <pre># 1. RunView: type in the Answer box, click Answer
+# 2. Temporal UI: workflow → More Actions → Send a Signal → name: answer, input: ["q1", "return 0"]
+# 3. CLI (verified on this setup):
+temporal workflow signal -w ignite-20261019-093000 --name answer --input '"q1"' --input '"return 0"'</pre>
+      <div class="where">Where: <code>answer()</code> signal and <code>wait_for_humans()</code> in workflow.py · <code>POST /api/runs/&lt;id&gt;/answer</code> in dashboard/server.py · notifications to Chat or Jira not built yet</div>
+    </div></div>
+
+    <div class="step"><div class="n">8</div><div class="body">
+      <h3>PR, AI review, human merge</h3>
+      <p>Plain code commits, pushes and opens the PR with the resolution summary. An AI review agent posts a comment. The workflow then checks the PR (1, 2, 4, 8, then every 15 minutes) until a person merges or closes it, and finishes.</p>
+      <div class="where">Where: <code>open_pr()</code>, <code>post_review()</code>, <code>pr_state()</code> in activities.py · add branch protection so the agent can never merge</div>
+    </div></div>
+  </section>
+
+  <section class="panel">
+    <h2>Not built yet</h2>
+    <p>Jira intake (call <code>POST /api/briefs</code> from a Jira Automation rule) · Chat or Jira notifications when a question is asked · a GitHub webhook to replace PR polling · login on RunView · the Bedrock path and the containerised worker, both untested.</p>
+    <div class="where">Decisions and reasons: docs/adr/ · checklist for a work repo: docs/work-repo-setup.md</div>
+  </section>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad: true, theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default"});</script>
