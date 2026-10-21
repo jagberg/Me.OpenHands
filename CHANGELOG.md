@@ -99,3 +99,15 @@ looped back from QA or asked the human on qwen3:14b, so the harnesses are not ra
 details in `bakeoff/README.md`.
 **Trade-off accepted:** Single run per harness on a weak model; conclusions are about wiring, not quality.
 **Supersedes:** n/a
+
+## 2026-10-21 - OpenHands chosen as the agent harness; ADR 0005 accepted
+
+**Decision:** Build the factory on the OpenHands SDK with the process in prompts; local model `qwen3.8:27b` (32k).
+**Reasoning:** On qwen3.8:27b (picked by a separate local-LLM benchmark) OpenHands and Codex both passed 3/3 trials
+(asked the human, resumed, QA PASS, hidden tests green). Codex's Bedrock provider is limited to OpenAI GPT models;
+OpenHands keeps any Bedrock model, including Claude, open.
+**Trade-off accepted:** No built-in command sandbox (must run in Docker); question detection relies on a prompt
+convention with a tolerant parser; QA -> brief loop-back not yet proven.
+**Alternatives rejected:** Codex SDK: Bedrock limited to GPT models, extra CLI binary. Claude Agent SDK: deferred, owner
+not using a Claude key yet.
+**Supersedes:** ADR 0001 in part (stage order in code); ADR 0005 status proposed -> accepted.

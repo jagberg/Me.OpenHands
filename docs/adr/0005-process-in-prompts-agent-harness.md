@@ -1,8 +1,8 @@
 # ADR 0005: Define the process in prompts inside an agent harness, not as coded workflow stages
 
-- Status: proposed (2026-10-19) - harness not chosen yet
-- Date: 2026-10-19
-- Reviews: ADR 0001 (stage order coded in a Temporal workflow)
+- Status: accepted (2026-10-21) with the **OpenHands SDK** as the harness - see [Acceptance](#acceptance-2026-10-21)
+- Date: 2026-10-19 (proposed), 2026-10-21 (accepted)
+- Supersedes in part: ADR 0001 (stage order coded in a Temporal workflow)
 
 ## Context
 
@@ -60,3 +60,31 @@ bottleneck, so the bake-off has not yet ranked the harnesses.
   can be judged, either a larger free local model or Bedrock (spend).
 - To accept: pick a harness after a bake-off on a stronger model shows it (1) follows the process, (2) loops back on a
   QA gap, (3) asks a human and resumes with the answer.
+
+## Acceptance (2026-10-21)
+
+**Harness: OpenHands SDK** (owner's choice, 2026-10-21).
+
+Evidence (`bakeoff/README.md`, rounds 2-3, local `qwen3.8:27b` at 32k context, $0): OpenHands and Codex both passed
+3 of 3 trials - followed the prompt-defined process, caught the spec requirement, asked the product owner, resumed the
+same session with the answer, QA PASS, all hidden tests green. The model chosen by the separate local-LLM benchmark
+(qwen3.8:27b) was enough where qwen3:14b was not.
+
+Why OpenHands over Codex when behaviour tied:
+- **Bedrock model freedom.** Codex's built-in `amazon-bedrock` provider officially supports only OpenAI GPT models
+  (OpenAI help article "Configure Codex with Amazon Bedrock", checked 2026-10-21). OpenHands reaches any model through
+  litellm, including Claude on Bedrock - untested here.
+- Pure Python and already used by `blueprint/` and RunView; Codex adds the Codex CLI binary to the stack.
+
+Accepted costs and open items:
+- **No built-in command sandbox** when OpenHands runs on the host (Codex has one). OpenHands must run inside Docker.
+- Two OpenHands quirks to guard against: with project skills loaded and `reasoning_effort="none"`, qwen3 returned empty
+  replies on every turn (leave reasoning on); a skill with invalid YAML frontmatter is skipped with only a log warning
+  (validate skills before use).
+- No built-in "ask a human" tool: the agent ends its turn with a question and the shell resumes the conversation with
+  the answer. The prompt-format convention needs a tolerant parser (`find_question()` in `bakeoff/harness/`).
+- **QA -> brief loop-back is still unproven**: in every trial the brief caught the requirement first.
+- Codex remains the alternative if GPT models on Bedrock become acceptable and a built-in sandbox matters more.
+
+Consequences now in force: `blueprint/` stops being the orchestrator of stage order. Temporal's remaining role (durable
+waits, if any) and RunView's data source move to the design of the thin shell around OpenHands.

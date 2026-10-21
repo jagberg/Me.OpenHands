@@ -7,10 +7,10 @@ retries, UI) and the **OpenHands SDK** (coding agents), running on a local Ollam
 Decisions: `docs/adr/` and `CHANGELOG.md` - read before proposing architecture changes.
 Setting this up on a work repo: `docs/work-repo-setup.md`.
 
-> **Direction under review (2026-10-19):** [ADR 0005](docs/adr/0005-process-in-prompts-agent-harness.md) (proposed)
-> would replace the coded stage order below with a process defined in prompts (`AGENTS.md` + skills) inside an existing
-> agent harness, because real work loops (build -> QA finds a gap -> re-plan with a human -> rebuild) and coding that loop
-> means rebuilding an agent harness. The harness is not chosen yet; see the bake-off below.
+> **Direction (accepted 2026-10-21):** [ADR 0005](docs/adr/0005-process-in-prompts-agent-harness.md) replaces the coded
+> stage order below with a process defined in prompts (`AGENTS.md` + skills) inside the **OpenHands SDK**, because real
+> work loops (build -> QA finds a gap -> re-plan with a human -> rebuild) and coding that loop means rebuilding an agent
+> harness. Local model: `qwen3.8:27b` (32k context). The Temporal blueprint below is the earlier prototype.
 
 ## Current state (2026-10-18)
 
@@ -65,8 +65,23 @@ tests score both. Details and raw results: [`bakeoff/README.md`](bakeoff/README.
    LM Studio and Amazon Bedrock providers; Claude Agent SDK is Claude-only under Anthropic's Commercial Terms and is
    deferred until the owner is ready to use a Claude key.
 
-Next: a stronger free local model (`gpt-oss:20b`) on both, plus a ticket that forces a question to prove
-ask -> wait -> resume.
+### Rounds 2-3 on qwen3.8:27b (2026-10-21)
+
+Same fixture; 32k context; the ticket now requires asking the product owner. Round 3 used the same tolerant question
+relay for both harnesses (round 2's strict relay missed OpenHands' differently worded question).
+
+| Round 3 (3 trials each) | **OpenHands SDK** | **Codex SDK** |
+|---|---|---|
+| Asked, resumed, finished | 3/3 | 3/3 |
+| Hidden tests | 3/3 in every trial | 3/3 in every trial |
+| QA verdict | PASS in every trial | PASS in every trial |
+| Time / tokens in | 6-12 min / 157-254k | 6-12 min / 121-271k |
+| Bedrock later | any model via litellm, incl. Claude (untested) | OpenAI GPT models only |
+| Sandbox for agent commands | none on the host (run in Docker) | built in |
+
+**Decision: OpenHands** (ADR 0005 accepted): tied on behaviour, and it keeps the Bedrock model choice open.
+Still unproven: QA sending the agent back to the brief (every brief caught the requirement first). Details:
+[`bakeoff/README.md`](bakeoff/README.md).
 
 ## Evolution of thinking
 
@@ -84,3 +99,5 @@ ask -> wait -> resume.
    (QA finds a gap, a human re-plans, rebuild) belongs in an agent harness, not hand-built workflow code (ADR 0005,
    proposed). Agent SDKs surveyed (Claude Agent SDK, OpenHands, Codex, Pi, OpenCode, Goose); OpenHands and Codex
    bake-off run on the local model (above).
+7. **2026-10-21** - A separate local-LLM benchmark picked `qwen3.8:27b`. On it both harnesses passed 3/3; OpenHands
+   chosen for Bedrock model freedom (ADR 0005 accepted, ADR 0001 superseded in part).
