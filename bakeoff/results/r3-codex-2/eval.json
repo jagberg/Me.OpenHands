@@ -1,0 +1,14 @@
+{
+ "visible_tests_pass": true,
+ "hidden": {
+  "test_basic": "PASSED",
+  "test_ignores_none": "PASSED",
+  "test_empty_is_zero": "PASSED"
+ },
+ "test_calc_untouched": true,
+ "brief_steps": 1,
+ "qa_steps": 3,
+ "log": "ignite-brief: drafted brief for average() bug ticket\nignite-plan: wrote plan (fix denominator, skip None, defer empty-list behaviour)\nignite-build: implementing plan with product decision (empty/all-None -> 0)\nqa-review: checked spec requirements against brief and code\nqa-review: checked all spec requirements against brief and code\nqa-review: checked spec requirements, brief, and code\n",
+ "qa_verdict": "VERDICT: PASS",
+ "calc_py": "def average(numbers):\n    \"\"\"Return the arithmetic mean of a list of numbers.\n\n    None values are ignored (missing readings, not zeros).\n    An empty list, or a list of only None values, returns 0.\n    \"\"\"\n    values = [n for n in numbers if n is not None]\n    if not values:\n        return 0\n    return sum(values) / len(values)\n"
+}

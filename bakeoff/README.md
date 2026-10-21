@@ -3,7 +3,8 @@
 Same fixture, same ticket, same scripted human answer, same local model (Ollama `qwen3-14b-oh`, qwen3:14b with 32k
 context). No Claude or OpenAI key, $0. The process is defined only in prompts (`fixture/AGENTS.md` and
 `fixture/.agents/skills/*/SKILL.md`); each harness only starts the agent and relays a `QUESTION:` line to a scripted
-product owner. Rationale: ADR 0005 (proposed).
+product owner. Rationale and outcome: ADR 0005 (accepted 2026-10-21 with OpenHands). Round 1 (qwen3:14b) is below;
+rounds 2-3 (qwen3.8:27b) are in [Rounds 2-3](#rounds-2-3-qwen3827b-2026-10-21).
 
 ## What the fixture tests
 - `calc.py` has the off-by-one bug from the original sandbox.
@@ -49,6 +50,48 @@ model `qwen3-14b-oh` (`FROM qwen3:14b`, `num_ctx 32768`), `npm install --prefix 
 `openai-codex`, a venv with `openhands-sdk==1.21.0 openhands-tools==1.21.0`, a venv with `pytest`, then `harness/run_all.sh`.
 
 ## Next (not done)
-- Stronger free local model (`gpt-oss:20b`, ~13 GB) on both harnesses.
-- A ticket that explicitly requires asking the product owner, to prove ask -> wait -> resume wiring independent of model judgement.
+- ~~Stronger free local model on both harnesses~~ done in rounds 2-3 (qwen3.8:27b instead of gpt-oss:20b).
+- ~~A ticket that explicitly requires asking the product owner~~ done in rounds 2-3.
+- A QA-only requirement to force the QA -> brief loop-back (still untested).
 - Claude Agent SDK deferred: the owner will not use a Claude key until the setup is better defined.
+
+## Rounds 2-3: qwen3.8:27b (2026-10-21)
+
+Model chosen by a separate local-LLM benchmark (`~/llm-compare/RESULTS.md` on the original machine): `qwen3.8:27b`
+Q4_K_M, run here as `qwen3.8-27b-32k` (`harness/Modelfile.qwen38-32k`, `num_ctx 32768`). Runs under
+`caffeinate -dimsu`, one model process at a time, gated on the benchmark's `STATUS.txt`.
+
+Changes from round 1: model; `max_output_tokens` 4096 -> 8192 (the benchmark saw a qwen3.8 reply truncated at 2048);
+the ticket now explicitly requires asking the product owner before building, to prove ask -> wait -> resume.
+
+**Round 2 (one run each, strict `QUESTION:` relay):** Codex passed everything (asked, resumed, implemented "return 0",
+QA PASS, 3/3 hidden tests). OpenHands wrote a correct brief and paused for the decision, but phrased it as
+"I'm pausing per the QUESTION protocol" without the exact `QUESTION:` line, so the strict relay missed it (0/3).
+
+**Round 3 (3 trials each, same tolerant relay for both):** `find_question()` in both harnesses accepts the exact line or
+a reply that says it is pausing for the question protocol.
+
+| Trial | Time | Asked | Resumed and finished | Hidden tests | QA verdict | Tokens in |
+|---|---|---|---|---|---|---|
+| OpenHands 1 | 383 s | yes | yes | 3/3 | PASS | 157k |
+| OpenHands 2 | 488 s | yes | yes | 3/3 | PASS | 159k |
+| OpenHands 3 | 744 s | yes | yes | 3/3 | PASS | 254k |
+| Codex 1 | 340 s | yes | yes | 3/3 | PASS | 121k |
+| Codex 2 | 580 s | yes | yes | 3/3 | PASS | 271k |
+| Codex 3 | 730 s | yes | yes | 3/3 | PASS | 233k |
+
+Raw outputs: `results/r2-*`, `results/r3-<harness>-<trial>`.
+
+**Findings**
+- On qwen3.8:27b both harnesses follow the prompt-defined process, catch the spec requirement, ask the human, resume the
+  same session with the answer and pass all hidden tests. Tied on behaviour.
+- QA loop-back is still **untested**: every brief caught the `None` requirement up front (the agents read
+  `docs/spec.md` while briefing), so QA never had a gap to send back. Codex trial 2 ran QA three times, but as repeated
+  checks, not a return to the brief. A fixture with a QA-only checklist is needed to force it.
+- Swap grew from 8.0 to 18 GB across the six back-to-back runs and later trials ran slower (383 s -> 744 s); the slowdown
+  across trials is likely memory pressure rather than the harnesses (not measured directly).
+
+**Decision:** OpenHands (ADR 0005). Deciding factor: Codex's built-in Bedrock provider officially supports only OpenAI GPT
+models (OpenAI help article "Configure Codex with Amazon Bedrock", checked 2026-10-21), while OpenHands reaches any
+model via litellm, including Claude on Bedrock (untested here). Accepted cost: OpenHands has no built-in command sandbox
+on the host, so it must run inside Docker.

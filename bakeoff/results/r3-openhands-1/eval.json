@@ -1,0 +1,14 @@
+{
+ "visible_tests_pass": true,
+ "hidden": {
+  "test_basic": "PASSED",
+  "test_ignores_none": "PASSED",
+  "test_empty_is_zero": "PASSED"
+ },
+ "test_calc_untouched": true,
+ "brief_steps": 2,
+ "qa_steps": 1,
+ "log": "ignite-brief: drafted brief from ticket + docs/spec.md (empty-list behaviour flagged as product decision)\nignite-brief: updated brief with product decision (empty list -> 0)\nignite-plan: root cause off-by-one divisor; plan to filter None, divide by count, return 0 for empty\nignite-build: implemented fix, pytest 1 passed, inline checks (incl. empty->0) OK\nqa-review: all spec requirements covered, VERDICT: PASS\n",
+ "qa_verdict": "VERDICT: PASS",
+ "calc_py": "def average(numbers):\n    \"\"\"Return the arithmetic mean of a list of numbers.\"\"\"\n    values = [n for n in numbers if n is not None]\n    if not values:\n        return 0\n    return sum(values) / len(values)\n"
+}
