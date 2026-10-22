@@ -52,7 +52,7 @@ model `qwen3-14b-oh` (`FROM qwen3:14b`, `num_ctx 32768`), `npm install --prefix 
 ## Next (not done)
 - ~~Stronger free local model on both harnesses~~ done in rounds 2-3 (qwen3.8:27b instead of gpt-oss:20b).
 - ~~A ticket that explicitly requires asking the product owner~~ done in rounds 2-3.
-- A QA-only requirement to force the QA -> brief loop-back (still untested).
+- ~~A QA-only requirement to force the QA -> brief loop-back~~ done in round 4 (OpenHands, passed).
 - Claude Agent SDK deferred: the owner will not use a Claude key until the setup is better defined.
 
 ## Rounds 2-3: qwen3.8:27b (2026-10-21)
@@ -95,3 +95,25 @@ Raw outputs: `results/r2-*`, `results/r3-<harness>-<trial>`.
 models (OpenAI help article "Configure Codex with Amazon Bedrock", checked 2026-10-21), while OpenHands reaches any
 model via litellm, including Claude on Bedrock (untested here). Accepted cost: OpenHands has no built-in command sandbox
 on the host, so it must run inside Docker.
+
+## Round 4: QA loop-back (2026-10-22)
+
+`fixture-qa/` adds `qa/checklist.md` with a requirement only the QA step reads (results rounded to 2 decimal places;
+`average([1, 2, 2])` is `1.67`). `AGENTS.md` says only qa-review opens `qa/`. Hidden tests: `hidden/test_hidden_qa.py`
+(round 3's three tests plus `test_rounds_two_dp`). OpenHands only (the chosen harness), qwen3.8-27b-32k, one run.
+
+Result (`results/r4-openhands/`, including the agent's own `log.md`, `qa.md` and `brief.md`):
+
+```
+ignite-brief  caught None requirement from spec; empty-list behaviour pending PO decision
+  QUESTION -> product owner: return 0 -> resumed
+ignite-brief  updated with PO decision
+ignite-plan -> ignite-build  tests pass
+qa-review     GAP - checklist requires rounding to 2 dp; brief missed it
+ignite-brief  revised after QA - added rounding requirement
+ignite-plan -> ignite-build  round(..., 2)
+qa-review     loop 1 VERDICT: PASS
+```
+
+Hidden tests 4/4, `test_calc.py` untouched, 690 s, 31 LLM calls, 379k in / 7k out tokens. The loop came from
+`AGENTS.md` and the skills alone; the harness has no orchestration code. Single run.

@@ -111,3 +111,11 @@ convention with a tolerant parser; QA -> brief loop-back not yet proven.
 **Alternatives rejected:** Codex SDK: Bedrock limited to GPT models, extra CLI binary. Claude Agent SDK: deferred, owner
 not using a Claude key yet.
 **Supersedes:** ADR 0001 in part (stage order in code); ADR 0005 status proposed -> accepted.
+
+## 2026-10-22 - QA loop-back proven on OpenHands
+
+**Decision:** None new; evidence for ADR 0005. Round 4 of the bake-off (`bakeoff/fixture-qa`) hid a requirement in a
+QA-only checklist; OpenHands on qwen3.8:27b asked the product owner, then QA reported the gap, the agent revised the
+brief, re-planned, rebuilt and passed QA and 4/4 hidden tests.
+**Trade-off accepted:** Single run; 11.5 min and 379k input tokens for a one-line fix on the local model.
+**Supersedes:** n/a (resolves the "loop-back unproven" item in ADR 0005)

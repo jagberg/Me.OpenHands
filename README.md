@@ -80,7 +80,8 @@ relay for both harnesses (round 2's strict relay missed OpenHands' differently w
 | Sandbox for agent commands | none on the host (run in Docker) | built in |
 
 **Decision: OpenHands** (ADR 0005 accepted): tied on behaviour, and it keeps the Bedrock model choice open.
-Still unproven: QA sending the agent back to the brief (every brief caught the requirement first). Details:
+QA loop-back proven on 2026-10-22 (round 4): with a requirement only QA could see, QA reported a GAP, the agent revised
+the brief, rebuilt and passed 4/4 hidden tests, driven only by `AGENTS.md` and the skills. Details:
 [`bakeoff/README.md`](bakeoff/README.md).
 
 ## Evolution of thinking

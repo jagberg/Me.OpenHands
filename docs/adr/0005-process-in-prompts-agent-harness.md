@@ -88,3 +88,7 @@ Accepted costs and open items:
 
 Consequences now in force: `blueprint/` stops being the orchestrator of stage order. Temporal's remaining role (durable
 waits, if any) and RunView's data source move to the design of the thin shell around OpenHands.
+
+**Update 2026-10-22:** QA -> brief loop-back proven on OpenHands (`bakeoff/README.md`, round 4): with a requirement only
+QA could see, QA reported a GAP, the agent revised the brief, re-planned, rebuilt and QA passed (4/4 hidden tests), with
+the loop driven only by `AGENTS.md` and the skills. Single run; the "still unproven" item above is resolved.
