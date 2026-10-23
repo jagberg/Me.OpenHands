@@ -58,7 +58,7 @@ function render(){
   const rows=win.filter(r=>(statusF==="ALL"||st(r)===statusF)&&(JSON.stringify([r.id,r.pr_url,r.model,r.problem]).toLowerCase().includes(q.toLowerCase())));
   body.innerHTML=rows.map(r=>{const s=st(r),d=sum(r,"duration_s"),o=open.has(r.id);
    return `<tr class="row" data-id="${esc(r.id)}"><td><span class="badge ${s}">${label(r)}</span></td><td><b>${esc(r.title||(r.engine==="temporal"?"IgniteBlueprint":"IgniteFixWorkflow"))}</b><div class="id">${esc(r.id)}${r.current_stage&&s!=="COMPLETED"?" · "+esc(r.current_stage):""}</div></td>
-   <td class="hide">${esc((r.model||"").replace("ollama_chat/",""))}</td><td class="hide">local · ${r.engine==="temporal"?"temporal":"script"}</td><td class="hide">${esc(r.source||r.triggered_by||"cli")}</td>
+   <td class="hide">${esc((r.model||"").replace("ollama_chat/",""))}</td><td class="hide">local · ${esc(r.engine==="openhands"?"openhands · docker":r.engine||"script")}</td><td class="hide">${esc(r.source||r.triggered_by||"cli")}</td>
    <td>${new Date(r.started).toLocaleTimeString([], {hour:"numeric",minute:"2-digit"})}</td><td>${dur(d)}</td><td>${esc(pending(r))}</td><td>${o?"▾":"↗"}</td></tr>`+(o?detail(r):"")}).join("")||`<tr><td colspan="9" class="mut">No runs match.</td></tr>`;
   body.querySelectorAll("tr.row").forEach(e=>e.onclick=()=>{open.has(e.dataset.id)?open.delete(e.dataset.id):open.add(e.dataset.id);render()});
   upd.textContent="updated "+new Date().toLocaleTimeString();

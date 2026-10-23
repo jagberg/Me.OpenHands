@@ -119,3 +119,16 @@ QA-only checklist; OpenHands on qwen3.8:27b asked the product owner, then QA rep
 brief, re-planned, rebuilt and passed QA and 4/4 hidden tests.
 **Trade-off accepted:** Single run; 11.5 min and 379k input tokens for a one-line fix on the local model.
 **Supersedes:** n/a (resolves the "loop-back unproven" item in ADR 0005)
+
+## 2026-10-23 - Factory shell around OpenHands built and verified
+
+**Decision:** Implement ADR 0005 as `factory/`: the agent runs in an OpenHands `DockerWorkspace` (commands never run
+on the host); a question parks the run and the answer resumes the same conversation in a new container; host-side
+checks (tests, protected files, QA verdict) gate the PR; git/gh stay on the host so credentials never enter the container.
+**Reasoning:** Keep only what the agent cannot do reliably outside it; reuse OpenHands' own isolation and conversation
+persistence instead of building them.
+**Trade-off accepted:** A 45 s conversation lease means a resume waits out the remainder if an answer arrives within
+seconds; one agent at a time (one local model); per-stage metrics not split yet.
+**Result:** Run `run-20261023-213418`: asked, parked, resumed, QA loop-back, checks passed, PR #5 on the trial repo,
+hidden tests 4/4.
+**Supersedes:** `blueprint/` as the main path (kept as the earlier prototype).

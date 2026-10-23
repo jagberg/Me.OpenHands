@@ -26,6 +26,7 @@ ticket -> setup* -> ignite-brief -> decision gate* -> [HUMAN answers] -> ignite-
 | `dashboard/` | RunView: runs, metrics, Answer buttons, New run (reads Temporal) | in use |
 | `docs/adr/` | Why it is built this way | 4 ADRs |
 | `docs/visuals/` | v1 vs v2 comparison page, dashboard screenshots | reference |
+| `factory/` | Thin shell around the OpenHands agent: Docker isolation, ask -> park -> resume, pre-PR checks, PR, RunView on :8766 | main path, verified 2026-10-23 |
 | `bakeoff/` | OpenHands SDK vs Codex SDK on the same prompt-defined process (harnesses, fixture, results) | run 2026-10-19 |
 | `trials/` | Devin/Factory trial pack (ticket, scorecard, vendor request) | not run |
 | `pipeline/` | First script-based pipeline | superseded, kept for reference |
@@ -102,3 +103,5 @@ the brief, rebuilt and passed 4/4 hidden tests, driven only by `AGENTS.md` and t
    bake-off run on the local model (above).
 7. **2026-10-21** - A separate local-LLM benchmark picked `qwen3.8:27b`. On it both harnesses passed 3/3; OpenHands
    chosen for Bedrock model freedom (ADR 0005 accepted, ADR 0001 superseded in part).
+8. **2026-10-23** - `factory/` built: OpenHands agent in Docker, question -> park -> resume in a fresh container,
+   host-side checks and PR. First end-to-end run produced PR #5 on the trial repo with the QA loop-back.

@@ -4,7 +4,7 @@ Decisions: `docs/adr/` and `CHANGELOG.md` - read before proposing architecture c
 Factory, n8n, Windmill, custom orchestrator, OpenHands CLI) were rejected for stated reasons; don't re-suggest them
 without new information.
 
-- Main code: `blueprint/` (Temporal workflow + OpenHands SDK). `pipeline/` is superseded.
+- Main code: `factory/` (thin shell around the OpenHands agent, ADR 0005). `blueprint/` (Temporal) and `pipeline/` are earlier prototypes.
 - Direction (ADR 0005, accepted 2026-10-21): the process lives in prompts (`AGENTS.md` + `.agents/skills`) inside the
   OpenHands SDK, local model `qwen3.8:27b` at 32k. Don't extend the coded stage order in `blueprint/`. Evidence:
   `bakeoff/README.md`. Run OpenHands inside Docker (no host sandbox); keep reasoning on; validate skill YAML.
