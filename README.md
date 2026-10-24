@@ -105,3 +105,6 @@ the brief, rebuilt and passed 4/4 hidden tests, driven only by `AGENTS.md` and t
    chosen for Bedrock model freedom (ADR 0005 accepted, ADR 0001 superseded in part).
 8. **2026-10-23** - `factory/` built: OpenHands agent in Docker, question -> park -> resume in a fresh container,
    host-side checks and PR. First end-to-end run produced PR #5 on the trial repo with the QA loop-back.
+9. **2026-10-24** - Flint 40B tried on the loop-back test: 4/4 and about 2.2 times faster than qwen3.8, but it read the
+   QA-only checklist early, so the loop-back never ran; qwen3.8 stays. HumanLayer open-sourced; watched until its
+   self-hosted stack runs without third-party keys (`CHANGELOG.md`).

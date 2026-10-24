@@ -132,3 +132,36 @@ seconds; one agent at a time (one local model); per-stage metrics not split yet.
 **Result:** Run `run-20261023-213418`: asked, parked, resumed, QA loop-back, checks passed, PR #5 on the trial repo,
 hidden tests 4/4.
 **Supersedes:** `blueprint/` as the main path (kept as the earlier prototype).
+
+## 2026-10-24 - Flint 40B tried; qwen3.8:27b stays the local model
+
+**Decision:** Keep `qwen3.8:27b` (32k) as the factory's local model. Recursive's Flint (`flint:40b`, 39.8B MoE with
+about 2.5B active, released 2026-10-21) is a speed candidate only.
+**Reasoning:** Bake-off round 5 (`bakeoff/README.md`) ran Flint on the round 4 test. It asked the product owner and
+passed 4/4 hidden tests in 194 s, but its brief step read `qa/checklist.md`, which `AGENTS.md` reserves for qa-review,
+so the QA loop-back never happened. Following the prompt-defined process is the point of ADR 0005, so a fast model that
+skips a rule loses. A control rerun of qwen3.8 on the upgraded Ollama passed the full loop-back in 426 s (690 s before).
+**Trade-off accepted:** Flint is about 2.2 times faster than qwen3.8 on the same Ollama. Its memory use (22 GB, swap
++10.3 GB in `~/llm-compare/RESULTS.md`) is also too high to run beside other apps on a 32 GB Mac. Single runs only.
+**Environment change:** Ollama on the development Mac was upgraded from 0.33.1 to 0.40.9 by the separate benchmark
+(Flint needs 0.40.8 or newer). qwen3.8 still runs on the `llamacpp` runner; Flint ran on MLX. The factory itself
+(`factory/`) has not been re-run on 0.40.9.
+**Revisit when:** a stricter `qa/` rule in `AGENTS.md` plus repeat runs show Flint follows the process, or the factory
+moves to hardware with spare memory.
+**Supersedes:** n/a
+
+## 2026-10-24 - HumanLayer open-sourced: watched, not adopted
+
+**Decision:** Do not replace `factory/` with HumanLayer (`github.com/humanlayer/humanlayer`, Apache-2.0, open-sourced
+in "Open Sourcing HumanLayer", Dexter Horthy, LinkedIn, Oct 2026) yet.
+**Reasoning:** It covers the parts of the factory that are custom here (dashboard, team view, human steering, Jira and
+Slack integrations; tasks, sessions, plans, diffs and PRs in its data model) and matches the owner's preference for a
+third-party base. But as of 2026-10-24: self-hosted processes refuse to start without third-party keys (WorkOS, Slack,
+Linear, ...), which conflicts with the no-keys, no-spend constraint; the stack is about 8 services (Postgres, Electric,
+MinIO, Redis, durable-streams, API, apps, a daemon per host), against two Python files; the daemon drives Claude Code
+and Codex, not OpenHands (OpenCode support is open issue #1119); and there is no stated maintenance commitment
+(open bug #1126: daemon leaks a Claude process per idle session).
+**Revisit when:** the keys become optional. Then spike HumanLayer + Codex + local Ollama on the trial repo; pass if a
+run is visible, a question reaches a human and returns, and the run ends in a PR. Adopting it would reopen ADR 0005,
+because the harness would become Codex, whose Bedrock provider officially supports GPT models only.
+**Supersedes:** n/a
