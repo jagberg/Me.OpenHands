@@ -28,7 +28,7 @@ curl -X POST localhost:8766/api/briefs -H 'Content-Type: application/json' \
 ```
 Defaults (`app.py: DEFAULT_CFG`): trial repo `jagberg/ai-agent-trial-sandbox`, seeded on a throwaway base branch with
 `bakeoff/fixture-qa`. Model `LLM_MODEL=ollama_chat/qwen3.8-27b-32k`, reached from the container at
-`host.docker.internal:11434`. Agent image `ghcr.io/openhands/agent-server:1.36.0-python`, arm64.
+`host.docker.internal:11434`. Agent image `ghcr.io/openhands/agent-server:1.21.0-python`, arm64; keep it on the same version as `openhands-sdk` (a 1.36 server writes event fields the 1.21 client rejects on resume).
 On this Mac the worker waits while `~/llm-compare/STATUS.txt` is not `STATE: READY`.
 
 ## Verified (2026-10-23, run `run-20261023-213418`)

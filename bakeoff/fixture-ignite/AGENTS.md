@@ -20,7 +20,9 @@ Talking to humans:
 
 House rules:
 - Append one line to `.ignite/log.md` at the start of every step: `<step name>: <one-line note>`.
-- The OpenSpec CLI: if `openspec` is missing, run `npm install -g @fission-ai/openspec@1.15.0`.
+- The OpenSpec CLI is `/workspace/.tools/node_modules/.bin/openspec` (use this full path wherever a skill says
+  `openspec`). If it is missing, run `npm install --prefix /workspace/.tools @fission-ai/openspec@1.15.0`. Do not use
+  `npm install -g`: each resume starts a fresh container, and only `/workspace` survives.
 - Run tests with `python3 -m pytest -q` (`pip install pytest` if missing). Never edit test_calc.py; add new tests in
   new files. Never run git commit or git push.
 - When QA passes, finish with a 3-line summary: what changed, which human decisions were applied, where the PRD and

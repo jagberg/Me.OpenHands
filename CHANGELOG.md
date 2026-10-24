@@ -201,3 +201,35 @@ the agent's reasoning.
 Telegram is a personal app, for this trial only. The design-review gate is enforced by the skill's prompt, not by code;
 it held once against a non-answer, which is evidence, not proof.
 **Supersedes:** the stand-in ignite skills as the factory default (`fixture-qa` kept as `QA_CFG` in `factory/app.py`).
+
+## 2026-10-25 - Resume really resumes; per-stage metrics in RunView
+
+**Decision:** Keep one OpenHands conversation per run across containers, pin the agent-server image to the SDK version,
+nudge the agent when it stops on a plain message, and show per-stage metrics in RunView.
+**Correction to the record:** The 2026-10-23 and 2026-10-24 entries above say an answer "resumes the same conversation".
+It did not. `Conversation()` defaults to `delete_on_close=True`, so `conv.close()` deleted the conversation after every
+turn, and each resume (PR #5, PR #6) started a fresh conversation that rebuilt context from the repo files. Found
+2026-10-24 because `runs/<id>/conversations/` was empty. Those runs still passed, which shows the repo files carried
+enough state, but they are not evidence that resume works.
+**What changed (`factory/shell.py`):**
+- `delete_on_close=False`. Resuming then failed with `ValidationError ... extended_content Extra inputs are not
+  permitted`: the 1.36.0 server wrote event fields the 1.21.0 client rejects. The default image is now
+  `ghcr.io/openhands/agent-server:1.21.0-python`; keep it on the same version as `openhands-sdk`.
+- In the SDK a text-only reply ends the run ("awaits user input", `agent/response_dispatch.py`). With the conversation
+  kept, qwen3.8 did this mid-process ("Let me view the full file to verify.") and burned both check retries. The shell
+  now sends a "continue" nudge in the same container (max 6 per turn) unless the agent called `finish` or asked a
+  QUESTION. Check retries are left for real check failures.
+- The OpenSpec CLI is installed under `/workspace/.tools` (`bakeoff/fixture-ignite/AGENTS.md`): each resume is a new
+  container and a global npm install was lost every turn.
+- `POST /api/runs/<id>/retry` re-queues a failed run in its conversation; a retry waits out the 45 s lease after a
+  failed turn too.
+- RunView shows per stage: agent time, LLM calls, tool calls, tokens and human wait, split from the conversation events
+  at each `.ignite/log.md` line (`stage_metrics`, self-check `factory/test_metrics.py`).
+**Result:** Run `run-20261025-081007`, "Add median() to calc": one conversation for all 7 turns, 3 human questions
+(empty-list rule, brief approval, design review), 2 nudges, all host checks, PR
+https://github.com/jagberg/ai-agent-trial-sandbox/pull/7, hidden tests 5/5, no ignite skill files in the PR. 1,953 s of
+agent time, 67 LLM calls, about 1.03M input tokens. Plan was the heaviest stage (1,228 s, 606k input tokens).
+**Trade-off accepted:** A kept conversation grows, so later turns send more tokens (summarised by the condenser) than
+the fresh-conversation runs did. The nudge is a workaround for a local-model habit; a model that calls `finish` never
+sees it. `caffeinate -s` does not stop sleep on battery: one run failed when the Mac slept (container start timed out).
+**Supersedes:** the "same conversation resumes" claims in the 2026-10-23 and 2026-10-24 entries (kept as written).

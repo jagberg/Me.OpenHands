@@ -3,6 +3,7 @@
   .venv/bin/python app.py
   POST /api/briefs {title, brief, cfg?}      start a run (cfg defaults to the trial repo + real ignite skills)
   POST /api/runs/<id>/answer {qid, answer}   answer the agent's question; the same conversation resumes
+  POST /api/runs/<id>/retry                  re-queue a failed run in the same conversation
   GET  /api/runs                             run records for the dashboard
 """
 import json, subprocess, sys, threading, time
@@ -62,6 +63,8 @@ class H(BaseHTTPRequestHandler):
                 out = {"id": shell.start(data["title"], data["brief"], data.get("cfg") or DEFAULT_CFG, data.get("source", "dashboard"))}
             elif parts[:2] == ["api", "runs"] and parts[-1] == "answer":
                 shell.answer(parts[2], data["qid"], data["answer"]); out = {"ok": True}
+            elif parts[:2] == ["api", "runs"] and parts[-1] == "retry":
+                shell.retry(parts[2]); out = {"ok": True}
             else:
                 return self.send_error(404)
             self.send(200, json.dumps(out).encode())

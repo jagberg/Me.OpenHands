@@ -20,10 +20,11 @@ HERE = Path(__file__).resolve().parent
 RUNS = Path(os.environ.get("FACTORY_RUNS", HERE.parent / "runs" / "factory"))
 MODEL = os.environ.get("LLM_MODEL", "ollama_chat/qwen3.8-27b-32k")
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://host.docker.internal:11434")  # as seen from the container
-SERVER_IMAGE = os.environ.get("AGENT_SERVER_IMAGE", "ghcr.io/openhands/agent-server:1.36.0-python")
+SERVER_IMAGE = os.environ.get("AGENT_SERVER_IMAGE", "ghcr.io/openhands/agent-server:1.21.0-python")  # must match openhands-sdk (requirements.txt)
 GATE = Path(os.environ.get("MODEL_GATE_FILE", Path.home() / "llm-compare" / "STATUS.txt"))  # shared-Mac benchmark gate
 MAX_CHECK_RETRIES = 2
 now = lambda: datetime.now().isoformat(timespec="seconds")
+secs_between = lambda a, b: (datetime.fromisoformat(b) - datetime.fromisoformat(a)).total_seconds() if b else 0
 
 
 def sh(cmd, cwd=None, check=True, timeout=600):
@@ -43,6 +44,23 @@ def find_question(final):
     if "question" in low and ("paus" in low or "answer and i" in low or "waiting for" in low or "stopping to ask" in low):
         return final.strip()[-300:]
     return None
+
+
+MAX_NUDGES = 6  # per turn; then the host checks decide
+NUDGE = ("Continue the process: do the next step with a tool now. When you need a human, write the QUESTION line. "
+         "When the whole process is finished, call the finish tool.")
+
+
+def ended_on_text(events):
+    """True if the agent's last word was a plain message rather than the finish tool."""
+    for e in reversed(events):
+        if getattr(e, "source", None) != "agent":
+            continue
+        if type(e).__name__ == "MessageEvent":
+            return True
+        if type(e).__name__ == "ActionEvent":
+            return getattr(e, "tool_name", None) != "finish"
+    return False
 
 
 # ---------- run record (runs/<id>/run.json, read by the dashboard) ----------
@@ -97,6 +115,16 @@ def answer(rid, qid, text):
                 b.write_text(b.read_text().replace("\nStatus: draft", "\nStatus: approved", 1))
                 event(rid, "approved", str(b.relative_to(RUNS / rid / "repo")))
     JOBS.put((rid, f"Answer from the product owner: {text}"))
+
+
+def retry(rid):
+    """Re-queue a failed run in its same conversation (e.g. the Mac slept and the container start timed out)."""
+    def f(r):
+        assert r["status"] == "failed", f"run is {r['status']}, not failed"
+        r.update(status="queued", check_attempts=0, error=None)
+    update(rid, f)
+    event(rid, "retried")
+    JOBS.put((rid, "The previous turn was interrupted. Check the repo state and continue the process from where it stopped."))
 
 
 # ---------- host side: repo, checks, PR ----------
@@ -178,30 +206,81 @@ def agent_turn(rid, message):
     # The agent server leases a conversation for 45 s and a stopped container does not release it, so a resume that
     # arrives sooner gets ConversationLeaseHeldError (seen 2026-10-23). Wait out the rest of the lease.
     # ponytail: fixed wait; only matters when an answer comes back within seconds (scripted tests, not humans).
-    last = r.get("turns", [{}])[-1].get("ended") if r.get("turns") else None
+    last = max([t["ended"] for t in r.get("turns", [])[-1:]] + [r.get("failed_at") or 0])  # a failed turn holds it too
     if last and r["conversation_id"]:
         time.sleep(max(0.0, 50 - (time.time() - last)))
     t0 = time.time()
     with DockerWorkspace(server_image=SERVER_IMAGE, platform="linux/arm64", volumes=[f"{d}:/workspace"]) as w:
         cid = uuid.UUID(r["conversation_id"]) if r["conversation_id"] else None
-        conv = Conversation(agent=agent, workspace=w, conversation_id=cid, visualizer=None, max_iteration_per_run=120)
+        # delete_on_close=False: the factory default is True, and close() then deletes the conversation server-side, so
+        # every resume silently started a fresh one (runs 2026-10-23..24; found because conversations/ was empty).
+        conv = Conversation(agent=agent, workspace=w, conversation_id=cid, visualizer=None, max_iteration_per_run=120,
+                            delete_on_close=False)
         update(rid, lambda r: r.update(conversation_id=str(conv.id)))
         conv.send_message(message)
-        conv.run()
-        final = get_agent_final_response(conv.state.events) or ""
+        for _ in range(MAX_NUDGES + 1):
+            conv.run()
+            final = get_agent_final_response(conv.state.events) or ""
+            # A plain text reply ends the run in the SDK; qwen does this mid-process ("Let me view the file.").
+            # Done = the finish tool or a QUESTION; anything else gets a nudge in the same container.
+            if find_question(final) or not ended_on_text(conv.state.events):
+                break
+            conv.send_message(NUDGE)
         try:
             m = conv.conversation_stats.get_combined_metrics(); u = m.accumulated_token_usage
             stats = {"llm_calls": len(m.response_latencies), "prompt_tokens": u.prompt_tokens, "completion_tokens": u.completion_tokens}
         except Exception:
             stats = {}
-        conv.close()  # keeps the conversation (delete_on_close=False) but lets the server release what it can
+        conv.close()  # stops the websocket; the conversation stays in runs/<id>/conversations for the next turn
     return final, round(time.time() - t0, 1), stats
 
 
 def stages_from_log(rid):
     log = RUNS / rid / "repo" / ".ignite" / "log.md"
     lines = [l for l in (log.read_text().splitlines() if log.exists() else []) if ":" in l]
-    return [{"name": l.split(":", 1)[0].strip(), "status": "done", "note": l.split(":", 1)[1].strip()} for l in lines]
+    stages = [{"name": l.split(":", 1)[0].strip(), "status": "done", "note": l.split(":", 1)[1].strip()} for l in lines]
+    return stage_metrics(rid, lines, stages)
+
+
+def stage_metrics(rid, lines, stages):
+    """Per-stage agent time, LLM calls, tokens and tools from the persisted OpenHands events. A stage starts at the
+    action that appended its line to .ignite/log.md. Gaps that end in a user message (a human answer or factory
+    feedback) are waiting, not agent time."""
+    d = RUNS / rid / "conversations"
+    evs = sorted((json.loads(p.read_text()) for p in d.glob("*/events/*.json")), key=lambda e: e["timestamp"])
+    if not evs:
+        return stages
+    ts = [datetime.fromisoformat(e["timestamp"]).timestamp() for e in evs]
+    starts, i = [], 0
+    for line in lines:  # first action at/after the previous stage start that wrote this log line
+        key = line[:40]
+        i = next((j for j in range(i, len(evs)) if evs[j]["kind"] == "ActionEvent" and key in json.dumps(evs[j])), None)
+        if i is None:
+            return stages  # log line not found in the events (edited by hand?): keep stages without metrics
+        starts.append(i)
+    usage = lambda e: [sum(u["accumulated_token_usage"][k] for u in e["value"]["usage_to_metrics"].values())
+                       for k in ("prompt_tokens", "completion_tokens")]
+    lat = {}
+    for st in d.glob("*/base_state.json"):
+        for u in json.loads(st.read_text()).get("stats", {}).get("usage_to_metrics", {}).values():
+            lat.update({x["response_id"]: x["latency"] for x in u.get("response_latencies", [])})
+    cum, cum_at = [0, 0], []
+    for e in evs:
+        if e["kind"] == "ConversationStateUpdateEvent" and e.get("key") == "stats":
+            cum = usage(e)
+        cum_at.append(cum)
+    starts[0] = 0  # reading AGENTS.md etc. before the first log line is first-stage work
+    for n, (s, a) in enumerate(zip(stages, starts)):
+        b = starts[n + 1] if n + 1 < len(starts) else len(evs)  # the LLM call that wrote a stage's log line counts to it
+        acts = [e for e in evs[a:b] if e["kind"] == "ActionEvent"]
+        calls = {e["llm_response_id"] for e in evs[a:b] if e.get("llm_response_id")}  # actions + final replies
+        work = sum(ts[j] - ts[j - 1] for j in range(max(a, 1), b) if not (evs[j]["kind"] == "MessageEvent" and evs[j]["source"] == "user"))
+        before = cum_at[a - 1] if a else [0, 0]
+        known = [lat[c] for c in calls if c in lat]
+        s.update(duration_s=round(work), llm_calls=len(calls), tool_calls=len(acts),
+                 prompt_tokens=cum_at[b - 1][0] - before[0], completion_tokens=cum_at[b - 1][1] - before[1],
+                 avg_latency_s=round(sum(known) / len(known), 1) if known else None)
+    return stages
 
 
 def step(rid, message):
@@ -212,7 +291,9 @@ def step(rid, message):
     def rec(r):
         r["stages"] = stages_from_log(rid)
         r.setdefault("turns", []).append({"ts": now(), "ended": time.time(), "seconds": secs, **stats, "final": final[-2000:]})
-        if r["stages"]:  # dashboard sums these; put the run's totals on the last stage row
+        for i, st in enumerate(r["stages"]):  # time each stage spent waiting on a human
+            st["wait_s"] = sum(secs_between(q["asked_at"], q.get("answered_at")) for q in r["questions"] if q.get("stage_idx") == i)
+        if r["stages"] and "llm_calls" not in r["stages"][0]:  # no events (old runs): run totals on the last stage row
             tot = lambda k: sum(t.get(k, 0) for t in r["turns"])
             r["stages"][-1].update(duration_s=tot("seconds"), llm_calls=tot("llm_calls"),
                                    prompt_tokens=tot("prompt_tokens"), completion_tokens=tot("completion_tokens"))
@@ -221,7 +302,8 @@ def step(rid, message):
     if q:
         def ask(r):
             r["questions"].append({"id": f"q{len(r['questions']) + 1}", "text": q, "blocking": True, "status": "open",
-                                   "stage": (r["stages"][-1]["name"] if r["stages"] else "agent"), "asked_at": now()})
+                                   "stage": (r["stages"][-1]["name"] if r["stages"] else "agent"),
+                                   "stage_idx": len(r["stages"]) - 1, "asked_at": now()})
             r.update(status="awaiting_decision", current_stage="waiting for a human")
         update(rid, ask)
         event(rid, "question", q[:200])
@@ -252,5 +334,5 @@ def worker():
         try:
             step(rid, msg)
         except Exception as e:
-            update(rid, lambda r: r.update(status="failed", error=f"{type(e).__name__}: {e}"[-1500:]))
+            update(rid, lambda r: r.update(status="failed", error=f"{type(e).__name__}: {e}"[-1500:], failed_at=time.time()))
             event(rid, "failed", str(e)[:200])
