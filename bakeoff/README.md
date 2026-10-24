@@ -117,3 +117,33 @@ qa-review     loop 1 VERDICT: PASS
 
 Hidden tests 4/4, `test_calc.py` untouched, 690 s, 31 LLM calls, 379k in / 7k out tokens. The loop came from
 `AGENTS.md` and the skills alone; the harness has no orchestration code. Single run.
+
+## Round 5: Flint 40B on round 4 (2026-10-24)
+
+Recursive's Flint (`flint:40b`, 39.8B MoE with about 2.5B active, released 2026-10-21) as `flint-32k`
+(`harness/Modelfile.flint-32k`: `num_ctx 32768`, temperature 1, top_k 20, top_p 0.95). Same fixture, ticket, answer and
+harness as round 4 (`harness/run_round5.sh`; the model is set through `BAKE_MODEL`). Ollama 0.40.9 (MLX backend; round 4
+ran on 0.33.1). One run.
+
+| | Round 4: qwen3.8-27b-32k | Round 5: flint-32k |
+|---|---|---|
+| Asked the product owner, resumed | yes | yes |
+| Hidden tests | 4/4 | 4/4 |
+| `test_calc.py` untouched | yes | yes |
+| QA loop-back (GAP, then brief revised) | yes | **no** |
+| Read `qa/` outside qa-review | no | **yes**: brief says "rounded to 2 decimal places (per QA checklist)" |
+| Wall time | 690 s | **194 s** |
+| LLM calls, input tokens | 31, 379k | 21, 219k |
+
+Flint produced the right code 3.6 times faster, but broke the `AGENTS.md` rule that only qa-review opens `qa/`, so the
+loop-back this round tests never happened. That is a process failure even though the hidden tests pass: on a real repo
+it means a step ignoring its instructions. Swap was about 17 GB at the end; the separate benchmark saw Flint grow swap by
+10.3 GB and called it too big to run comfortably beside other apps on 32 GB. Results in `results/r5-flint-openhands/`.
+Verdict: qwen3.8 stays the default; Flint is a speed candidate if a stricter prompt or a repeat run shows it follows
+the process.
+
+**Control: qwen3.8 rerun on Ollama 0.40.9 (2026-10-24).** Round 4 repeated unchanged, to separate the model from the
+Ollama upgrade. `ollama ps` showed qwen3.8 on the `llamacpp` runner (not MLX). Result: asked and resumed, QA GAP then
+brief revised and rebuilt, QA PASS, hidden 4/4, `test_calc.py` untouched. 426 s (was 690 s on 0.33.1), 32 LLM calls,
+366k in / 5.6k out tokens. Results in `results/r4b-openhands-ollama0409/`. So the upgrade alone made qwen3.8 about 1.6
+times faster on this run, and Flint's remaining lead over it is about 2.2 times (194 s against 426 s). One run each.

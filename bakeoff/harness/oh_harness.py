@@ -19,7 +19,7 @@ def find_question(final):
 
 
 ws, ticket, answer = sys.argv[1:4]
-llm = LLM(model="ollama_chat/qwen3.8-27b-32k", base_url="http://localhost:11434", api_key="ollama",  # reasoning left on: with skills + reasoning off, qwen3 returned empty replies
+llm = LLM(model="ollama_chat/" + os.environ.get("BAKE_MODEL", "qwen3.8-27b-32k"), base_url="http://localhost:11434", api_key="ollama",  # reasoning left on: with skills + reasoning off, qwen3 returned empty replies
           max_input_tokens=32768, max_output_tokens=8192, timeout=900, native_tool_calling=True,
           litellm_extra_body={"options": {"num_ctx": 32768}}, usage_id="agent")
 skills = load_project_skills(ws)  # repo .agents/skills + AGENTS.md
