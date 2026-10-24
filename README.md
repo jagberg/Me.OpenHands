@@ -108,3 +108,6 @@ the brief, rebuilt and passed 4/4 hidden tests, driven only by `AGENTS.md` and t
 9. **2026-10-24** - Flint 40B tried on the loop-back test: 4/4 and about 2.2 times faster than qwen3.8, but it read the
    QA-only checklist early, so the loop-back never ran; qwen3.8 stays. HumanLayer open-sourced; watched until its
    self-hosted stack runs without third-party keys (`CHANGELOG.md`).
+10. **2026-10-24** - The factory runs the real ignite skills (unmodified, never committed) with OpenSpec, and relays
+   questions through Telegram. First run: brief revised and approved, design review, build, QA, PR #6 on the trial
+   repo, hidden tests 5/5.

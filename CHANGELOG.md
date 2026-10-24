@@ -165,3 +165,39 @@ and Codex, not OpenHands (OpenCode support is open issue #1119); and there is no
 run is visible, a question reaches a human and returns, and the run ends in a PR. Adopting it would reopen ADR 0005,
 because the harness would become Codex, whose Bedrock provider officially supports GPT models only.
 **Supersedes:** n/a
+
+## 2026-10-24 - Real ignite skills and a Telegram relay in the factory
+
+**Decision:** The factory runs the CompareClub ignite plugin's own `brief`, `plan` and `build` skills (v0.4.0, unmodified)
+with OpenSpec 1.15 as the spec engine, and relays questions through a Telegram bot.
+**Reasoning:** The stand-in skills proved the loop; the real skills are what a work-repo pilot will run. OpenSpec's
+`openspec init --tools agents` writes `.agents/skills`, which OpenHands loads natively, so `opsx:propose` and
+`opsx:apply` map to existing skills instead of new glue. Telegram was chosen as a local, free, two-way channel
+(long polling, no public URL) until an enterprise channel (Google Chat, possibly via CC.Tool.Alfred) is set up.
+**How:**
+- The ignite skills are copyright CompareClub, all rights reserved, so the shell copies them into each run's workspace
+  from the installed plugin and lists them in `.git/info/exclude`. They are never committed, pushed or published (this
+  repo is public).
+- OpenHands requires a skill's `name` to match its directory, so the skills live at `.agents/skills/{brief,plan,build}`.
+- `bakeoff/fixture-ignite/` holds a repo-specific `AGENTS.md` adapter (the skills' "ask the user" = the QUESTION line;
+  PRD destination and engine come from `knowledge/calc.md`) and the two OpenSpec skills the plan and build steps use.
+- Brief approval stays a human gate in code (ADR 0002): an answer starting with "approve" makes the shell set
+  `Status: approved`; the agent never writes it, and a pre-PR check fails on any unapproved brief.
+- The ignite + OpenSpec skills are about 60 KB, so the agent uses OpenHands' `LLMSummarizingCondenser` to fit 32k.
+- `factory/telegram.py` (stdlib only): questions (with the agent's reasoning) go to one configured chat; a reply answers
+  the question it replies to; other chats, bot commands and messages sent while the relay was down are ignored.
+  Token and chat id live in `~/.config/factory/telegram.env` (mode 600), outside the repo.
+**Result:** Run `run-20261024-151022`, ticket "Add median() to calc": brief drafted, changes requested, revised,
+approved (code flipped the status); OpenSpec proposal (`openspec validate` passes); design-review gate; apply,
+tests, QA PASS; all host checks including `brief_approved`; PR https://github.com/jagberg/ai-agent-trial-sandbox/pull/6.
+Hidden tests (`bakeoff/hidden/test_hidden_median.py`) 5/5. No ignite skill files in the PR. 7 agent turns, 2,437 s of
+agent time, 88 LLM calls, 1.15M input tokens, 5 human questions (the last two answered from Telegram).
+**Found and fixed on the way:** (1) a question stated in an earlier message of a turn ("see QUESTION line above") was
+missed; the parser now also matches "stopping to ask". (2) The relay took the bot's `/start` setup message as the answer
+to the design-review gate; `ignite:build` refused it as not an explicit yes and asked again, so the prompt-level gate
+held, and the relay now ignores commands and backlog. (3) Telegram showed only the question line; it now includes
+the agent's reasoning.
+**Trade-off accepted:** Slow and token-heavy on the local model (about 40 minutes of agent time for a small function).
+Telegram is a personal app, for this trial only. The design-review gate is enforced by the skill's prompt, not by code;
+it held once against a non-answer, which is evidence, not proof.
+**Supersedes:** the stand-in ignite skills as the factory default (`fixture-qa` kept as `QA_CFG` in `factory/app.py`).

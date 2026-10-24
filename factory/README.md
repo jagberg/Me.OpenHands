@@ -37,6 +37,16 @@ Agent asked the product owner -> run parked -> answered via the API -> resumed i
 https://github.com/jagberg/ai-agent-trial-sandbox/pull/5. Hidden tests 4/4 on the agent's code. 2 turns, 44 LLM calls,
 ~482k input tokens, ~15 min on qwen3.8:27b.
 
+## Real ignite skills + Telegram (2026-10-24, run `run-20261024-151022`)
+`DEFAULT_CFG` now seeds `bakeoff/fixture-ignite` (AGENTS.md adapter, `knowledge/calc.md`, OpenSpec propose/apply
+skills) and copies the ignite plugin's `brief`, `plan`, `build` skills into each run, excluded from git (they are
+CompareClub copyright; never commit them here). Brief approval is set by the shell when a human answers "approve...".
+Result: PR https://github.com/jagberg/ai-agent-trial-sandbox/pull/6, hidden tests 5/5. Details: `CHANGELOG.md`.
+
+Telegram relay (`telegram.py`, optional): create `~/.config/factory/telegram.env` (mode 600) with
+`TELEGRAM_BOT_TOKEN=` (a dedicated bot) and `TELEGRAM_CHAT_ID=` (`.venv/bin/python telegram.py chat-id` after messaging
+the bot). Questions arrive with the agent's reasoning; reply to answer. Check: `.venv/bin/python test_telegram.py`.
+
 ## Gotchas found
 - **Conversation lease:** the agent server leases a conversation for 45 s and a stopped container does not release it;
   a resume inside that window fails with `ConversationLeaseHeldError` (HTTP 500). The shell closes the conversation and
@@ -47,4 +57,4 @@ https://github.com/jagberg/ai-agent-trial-sandbox/pull/5. Hidden tests 4/4 on th
 
 ## Not built yet
 Per-stage token/time split (the stage table shows the run's totals on the last stage), AI review comment on the PR,
-Jira/Chat intake and notifications, dashboard auth, Bedrock, running the shell itself in a container.
+Jira intake and an enterprise chat channel (Telegram is the trial relay), dashboard auth, Bedrock, running the shell itself in a container.
