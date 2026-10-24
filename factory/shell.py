@@ -39,7 +39,8 @@ def find_question(final):
         if "QUESTION:" in line:
             return line.split("QUESTION:", 1)[1].strip()
     low = final.lower()
-    if "question" in low and ("paus" in low or "answer and i" in low or "waiting for" in low):
+    # run-20261024-151022: "Stopping to ask the product owner (see QUESTION line above)" with the line in an earlier message
+    if "question" in low and ("paus" in low or "answer and i" in low or "waiting for" in low or "stopping to ask" in low):
         return final.strip()[-300:]
     return None
 
@@ -57,8 +58,11 @@ def update(rid, fn):
         tmp = path(rid).with_suffix(".tmp"); tmp.write_text(json.dumps(r, indent=2)); tmp.replace(path(rid))
         return r
 
+NOTIFY = []  # callables (rid, kind, msg), e.g. telegram.notify
+
 def event(rid, kind, msg=""):
     update(rid, lambda r: r["events"].append({"ts": now(), "kind": kind, "msg": msg}))
+    for f in NOTIFY: f(rid, kind, msg)
 
 
 # ---------- public API: start a run, answer a question ----------
@@ -87,6 +91,11 @@ def answer(rid, qid, text):
         q.update(status="answered", answer=text, answered_at=now()); r["status"] = "queued"
     update(rid, f)
     event(rid, "answered", f"{qid}: {text[:120]}")
+    if text.strip().lower().startswith("approve"):  # human gate in code (ADR 0002): only a human approves a brief
+        for b in (RUNS / rid / "repo").glob("intent/*/brief.md"):
+            if "\nStatus: draft" in b.read_text():
+                b.write_text(b.read_text().replace("\nStatus: draft", "\nStatus: approved", 1))
+                event(rid, "approved", str(b.relative_to(RUNS / rid / "repo")))
     JOBS.put((rid, f"Answer from the product owner: {text}"))
 
 
@@ -105,6 +114,9 @@ def setup_repo(rid):
             p = repo / "AGENTS.md"; p.write_text(p.read_text().replace(old, new))
         sh(["git", "add", "-A"], cwd=repo); sh(["git", "commit", "-q", "-m", "chore: seed factory test snapshot"], cwd=repo)
     sh(["git", "checkout", "-q", "-b", f"ai/{rid}"], cwd=repo)
+    for src in c.get("private_skills", []):  # e.g. the ignite plugin's skills: copied per run, never committed or pushed
+        src = Path(src).expanduser(); shutil.copytree(src, repo / ".agents" / "skills" / src.name)
+        with open(repo / ".git" / "info" / "exclude", "a") as f: f.write(f"/.agents/skills/{src.name}/\n")
     update(rid, lambda r: r.update(base_branch=base, head_branch=f"ai/{rid}"))
 
 def run_checks(rid):
@@ -116,7 +128,11 @@ def run_checks(rid):
     verdict = next((l for l in (qa.read_text().splitlines() if qa.exists() else [])[::-1] if "VERDICT" in l.upper()), "")
     checks = {"tests_pass": t.returncode == 0, "protected_files_untouched": not touched,
               "qa_verdict_pass": "PASS" in verdict.upper(), "has_changes": bool(changed)}
+    unapproved = [str(b.relative_to(repo)) for b in repo.glob("intent/*/brief.md") if "\nStatus: approved" not in b.read_text()]
+    if list(repo.glob("intent/*/brief.md")):
+        checks["brief_approved"] = not unapproved
     feedback = []
+    if unapproved: feedback.append(f"Briefs not approved by a human: {unapproved}. Ask for approval with a QUESTION.")
     if not checks["tests_pass"]: feedback.append(f"The test command `{c['test_cmd']}` fails:\n{(t.stdout + t.stderr)[-1200:]}")
     if touched: feedback.append(f"You edited protected files {touched}; revert them.")
     if not checks["qa_verdict_pass"]: feedback.append("qa-review has not recorded `VERDICT: PASS` in .ignite/qa.md; finish the process.")
@@ -143,6 +159,7 @@ def open_pr(rid):
 # ---------- agent side: one turn of the conversation, in Docker ----------
 def agent_turn(rid, message):
     from openhands.sdk import LLM, Agent, AgentContext, Conversation
+    from openhands.sdk.context.condenser import LLMSummarizingCondenser
     from openhands.sdk.conversation.response_utils import get_agent_final_response
     from openhands.sdk.skills import load_project_skills
     from openhands.tools.preset.default import get_default_tools
@@ -153,7 +170,9 @@ def agent_turn(rid, message):
               max_input_tokens=32768, max_output_tokens=8192, timeout=900, native_tool_calling=True, usage_id="agent")
     # reasoning left on: with skills loaded and reasoning off, qwen3 returned empty replies (bakeoff round 1)
     skills = load_project_skills(d / "repo")  # repo's .agents/skills + AGENTS.md, read on the host
-    agent = Agent(llm=llm, tools=get_default_tools(enable_browser=False)[:2],
+    # The ignite + OpenSpec skills are ~60 KB; summarise older history so a long turn fits the 32k window.
+    condenser = LLMSummarizingCondenser(llm=llm.model_copy(update={"usage_id": "condenser"}), max_tokens=24000, keep_first=2)
+    agent = Agent(llm=llm, tools=get_default_tools(enable_browser=False)[:2], condenser=condenser,
                   agent_context=AgentContext(skills=skills, load_user_skills=False, load_public_skills=False,
                                              system_message_suffix="The repository is at /workspace/repo. Work there."))
     # The agent server leases a conversation for 45 s and a stopped container does not release it, so a resume that
@@ -192,7 +211,7 @@ def step(rid, message):
     final, secs, stats = agent_turn(rid, message)
     def rec(r):
         r["stages"] = stages_from_log(rid)
-        r.setdefault("turns", []).append({"ts": now(), "ended": time.time(), "seconds": secs, **stats, "final": final[-600:]})
+        r.setdefault("turns", []).append({"ts": now(), "ended": time.time(), "seconds": secs, **stats, "final": final[-2000:]})
         if r["stages"]:  # dashboard sums these; put the run's totals on the last stage row
             tot = lambda k: sum(t.get(k, 0) for t in r["turns"])
             r["stages"][-1].update(duration_s=tot("seconds"), llm_calls=tot("llm_calls"),

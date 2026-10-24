@@ -1,7 +1,7 @@
 """Factory server: RunView dashboard + API on 127.0.0.1:8766. Runs the shell's single worker thread.
 
   .venv/bin/python app.py
-  POST /api/briefs {title, brief, cfg?}      start a run (cfg defaults to the trial repo + loop-back fixture)
+  POST /api/briefs {title, brief, cfg?}      start a run (cfg defaults to the trial repo + real ignite skills)
   POST /api/runs/<id>/answer {qid, answer}   answer the agent's question; the same conversation resumes
   GET  /api/runs                             run records for the dashboard
 """
@@ -9,15 +9,20 @@ import json, subprocess, sys, threading, time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
-import shell
+import shell, telegram
 
 ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_CFG = {
+QA_CFG = {  # verified 2026-10-23 (PR #5): stand-in ignite skills, QA-only checklist, buggy calc.py
     "repo": "jagberg/ai-agent-trial-sandbox",
-    "seed_dir": str(ROOT / "bakeoff" / "fixture-qa"),          # AGENTS.md, skills, spec, QA-only checklist, buggy calc.py
+    "seed_dir": str(ROOT / "bakeoff" / "fixture-qa"),
     "seed_replace": {"/private/tmp/claude-501/bake/pyenv/bin/python -m pytest -q": "python3 -m pytest -q (pip install pytest if missing)"},
     "test_cmd": "/private/tmp/claude-501/bake/pyenv/bin/python -m pytest -q",  # host-side check
     "protected": ["test_calc.py"],
+}
+DEFAULT_CFG = {  # real ignite skills (CompareClub plugin, copied per run, never pushed) + OpenSpec + median() feature
+    **QA_CFG,
+    "seed_dir": str(ROOT / "bakeoff" / "fixture-ignite"), "seed_replace": {},
+    "private_skills": [f"~/.claude/plugins/cache/compareclub-ignite/ignite/0.4.0/skills/{s}" for s in ("brief", "plan", "build")],
 }
 _pr: dict = {}
 
@@ -71,5 +76,6 @@ if __name__ == "__main__":
     port = int(sys.argv[1]) if len(sys.argv) > 1 else 8766
     shell.RUNS.mkdir(parents=True, exist_ok=True)
     threading.Thread(target=shell.worker, daemon=True).start()
+    print("telegram relay:", "on" if telegram.start() else f"off (no {telegram.ENV})", flush=True)
     print(f"factory on http://127.0.0.1:{port}  runs in {shell.RUNS}", flush=True)
     ThreadingHTTPServer(("127.0.0.1", port), H).serve_forever()
