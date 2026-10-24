@@ -1,0 +1,334 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "AI Software Factory: architecture and a sample run",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "main-path",
+        "label": "Brief to PR",
+        "focus": [
+          "po",
+          "server",
+          "shell",
+          "agent",
+          "llm",
+          "gh"
+        ],
+        "note": "Brief in, agent turns in Docker on the local model, checks, PR out."
+      },
+      {
+        "id": "human-loop",
+        "label": "Ask a human",
+        "focus": [
+          "shell",
+          "telegram",
+          "po",
+          "server"
+        ],
+        "note": "A QUESTION parks the run; the reply resumes the same conversation."
+      },
+      {
+        "id": "state",
+        "label": "Run state",
+        "focus": [
+          "agent",
+          "ws",
+          "skills"
+        ],
+        "note": "Repo, conversation events and private skills live in runs/<id>, mounted as /workspace."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "po",
+      "type": "external",
+      "label": "Product owner",
+      "sublabel": "brief + answers",
+      "pos": [
+        40,
+        300
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "server",
+      "type": "frontend",
+      "label": "Factory server",
+      "sublabel": "app.py + RunView :8766",
+      "pos": [
+        290,
+        300
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "shell",
+      "type": "backend",
+      "label": "Shell worker",
+      "sublabel": "shell.py: gates, checks",
+      "pos": [
+        540,
+        300
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "human gates in code"
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "OpenHands agent",
+      "sublabel": "agent-server 1.21.0",
+      "pos": [
+        790,
+        300
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "Docker"
+    },
+    {
+      "id": "llm",
+      "type": "cloud",
+      "label": "qwen3.8:27b",
+      "sublabel": "Ollama :11434, 32k",
+      "pos": [
+        1040,
+        300
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "telegram",
+      "type": "frontend",
+      "label": "Telegram relay",
+      "sublabel": "telegram.py",
+      "pos": [
+        290,
+        100
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "gate",
+      "type": "security",
+      "label": "Model gate",
+      "sublabel": "STATUS.txt READY",
+      "pos": [
+        540,
+        100
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "gh",
+      "type": "external",
+      "label": "GitHub PR",
+      "sublabel": "human review + merge",
+      "pos": [
+        540,
+        520
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "ws",
+      "type": "database",
+      "label": "Run workspace",
+      "sublabel": "runs/<id> = /workspace",
+      "pos": [
+        790,
+        520
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "skills",
+      "type": "security",
+      "label": "ignite skills",
+      "sublabel": "brief, plan, build",
+      "pos": [
+        1040,
+        520
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "never pushed"
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Developer Mac (127.0.0.1 only)",
+      "wraps": [
+        "server",
+        "shell",
+        "agent",
+        "llm",
+        "telegram",
+        "gate",
+        "ws",
+        "skills"
+      ]
+    },
+    {
+      "kind": "security-group",
+      "label": "Docker sandbox",
+      "wraps": [
+        "agent"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "brief-in",
+      "from": "po",
+      "to": "server",
+      "label": "brief",
+      "variant": "emphasis"
+    },
+    {
+      "id": "queue-run",
+      "from": "server",
+      "to": "shell",
+      "label": "queue"
+    },
+    {
+      "id": "agent-turn",
+      "from": "shell",
+      "to": "agent",
+      "label": "turn",
+      "variant": "emphasis"
+    },
+    {
+      "id": "model-calls",
+      "from": "agent",
+      "to": "llm",
+      "label": "tool calls"
+    },
+    {
+      "id": "gate-check",
+      "from": "gate",
+      "to": "shell",
+      "label": "start only if READY",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        615,
+        232
+      ]
+    },
+    {
+      "id": "ask-human",
+      "from": "shell",
+      "to": "telegram",
+      "label": "QUESTION",
+      "variant": "dashed",
+      "fromSide": "top",
+      "toSide": "right"
+    },
+    {
+      "id": "reply",
+      "from": "telegram",
+      "to": "po",
+      "label": "ask / reply",
+      "variant": "dashed",
+      "fromSide": "left",
+      "toSide": "top"
+    },
+    {
+      "id": "open-pr",
+      "from": "shell",
+      "to": "gh",
+      "label": "checks pass: PR",
+      "variant": "emphasis",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        615,
+        442
+      ]
+    },
+    {
+      "id": "persist",
+      "from": "agent",
+      "to": "ws",
+      "label": "edits, events",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [
+        865,
+        442
+      ]
+    },
+    {
+      "id": "copy-skills",
+      "from": "skills",
+      "to": "ws",
+      "label": "copied per run",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Sample inputs (run-20261025-081007)",
+      "items": [
+        "Brief: \"Add median() to calc\"",
+        "q1 empty list? answer: return None",
+        "q2 brief: approve",
+        "q3 design: approved, build"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Sample outputs",
+      "items": [
+        "intent/median/brief.md (approved)",
+        "OpenSpec change add-median-to-calc",
+        "calc.py + test_median.py, QA PASS",
+        "PR #7, hidden tests 5/5"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Run metrics",
+      "items": [
+        "7 turns, 1 conversation, 2 nudges",
+        "1,953 s agent time, 67 LLM calls",
+        "about 1.03M input tokens"
+      ]
+    }
+  ]
+}

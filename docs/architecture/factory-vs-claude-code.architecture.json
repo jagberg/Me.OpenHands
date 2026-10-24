@@ -1,0 +1,286 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Factory harness: OpenHands today vs Claude Code",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "today",
+        "label": "Today: OpenHands",
+        "focus": [
+          "shell",
+          "oh",
+          "qwen",
+          "ohskills"
+        ],
+        "note": "ADR 0005: OpenHands SDK in Docker on local qwen3.8; ignite skills adapted through AGENTS.md."
+      },
+      {
+        "id": "claude",
+        "label": "Alternative: Claude Code",
+        "focus": [
+          "shell",
+          "cc",
+          "bedrock",
+          "ccplugin"
+        ],
+        "note": "Claude Agent SDK runs the ignite plugin as-is; Claude models only (API or Bedrock)."
+      },
+      {
+        "id": "shared",
+        "label": "What stays the same",
+        "focus": [
+          "po",
+          "shell",
+          "gh"
+        ],
+        "note": "Brief intake, human gates in code (ADR 0002), host checks and the PR do not change."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "po",
+      "type": "external",
+      "label": "Product owner",
+      "sublabel": "brief, answers, merge",
+      "pos": [
+        40,
+        250
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "shell",
+      "type": "backend",
+      "label": "Factory shell",
+      "sublabel": "queue, gates, checks",
+      "pos": [
+        330,
+        250
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "unchanged"
+    },
+    {
+      "id": "gh",
+      "type": "external",
+      "label": "GitHub PR",
+      "sublabel": "human review",
+      "pos": [
+        330,
+        450
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "ohskills",
+      "type": "security",
+      "label": "Copied skills",
+      "sublabel": "AGENTS.md adapter",
+      "pos": [
+        680,
+        40
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "oh",
+      "type": "backend",
+      "label": "OpenHands agent",
+      "sublabel": "SDK 1.21, Docker",
+      "pos": [
+        680,
+        150
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "qwen",
+      "type": "cloud",
+      "label": "qwen3.8:27b",
+      "sublabel": "Ollama, $0",
+      "pos": [
+        1040,
+        150
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "cc",
+      "type": "backend",
+      "label": "Claude Agent SDK",
+      "sublabel": "Claude Code engine",
+      "pos": [
+        680,
+        350
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "bedrock",
+      "type": "cloud",
+      "label": "Claude on Bedrock",
+      "sublabel": "per-token spend",
+      "pos": [
+        1040,
+        350
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "ccplugin",
+      "type": "security",
+      "label": "ignite plugin",
+      "sublabel": "loaded as-is",
+      "pos": [
+        680,
+        460
+      ],
+      "size": [
+        150,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Today (ADR 0005)",
+      "wraps": [
+        "ohskills",
+        "oh",
+        "qwen"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Alternative (deferred: no Claude key)",
+      "wraps": [
+        "cc",
+        "bedrock",
+        "ccplugin"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "brief",
+      "from": "po",
+      "to": "shell",
+      "label": "brief",
+      "variant": "emphasis"
+    },
+    {
+      "id": "oh-turn",
+      "from": "shell",
+      "to": "oh",
+      "label": "turn + nudges",
+      "variant": "emphasis"
+    },
+    {
+      "id": "cc-turn",
+      "from": "shell",
+      "to": "cc",
+      "label": "AskUserQuestion",
+      "variant": "dashed"
+    },
+    {
+      "id": "oh-model",
+      "from": "oh",
+      "to": "qwen",
+      "label": "litellm"
+    },
+    {
+      "id": "cc-model",
+      "from": "cc",
+      "to": "bedrock",
+      "label": "Claude only",
+      "variant": "dashed"
+    },
+    {
+      "id": "oh-skills",
+      "from": "ohskills",
+      "to": "oh",
+      "label": "load_project_skills",
+      "labelAt": [
+        755,
+        132
+      ]
+    },
+    {
+      "id": "cc-skills",
+      "from": "ccplugin",
+      "to": "cc",
+      "label": "native",
+      "variant": "dashed"
+    },
+    {
+      "id": "pr",
+      "from": "shell",
+      "to": "gh",
+      "label": "checks pass: PR",
+      "variant": "emphasis",
+      "labelAt": [
+        405,
+        382
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Claude Code removes",
+      "items": [
+        "AGENTS.md adapter: ignite runs as its own plugin",
+        "QUESTION-line parsing: AskUserQuestion + resume",
+        "Version pinning of a separate agent server",
+        "Nudges (likely; untested here)"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Claude Code costs",
+      "items": [
+        "Claude models only: no local $0 runs",
+        "Needs a Claude key or Bedrock spend",
+        "Commercial terms, not open source",
+        "Sandbox is ours to set up (Docker)"
+      ]
+    },
+    {
+      "dot": "slate",
+      "title": "Unchanged either way",
+      "items": [
+        "Human gates in code (ADR 0002)",
+        "Host checks, PR, RunView, Telegram",
+        "Same brief and same ignite process"
+      ]
+    }
+  ]
+}
