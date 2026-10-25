@@ -1,4 +1,59 @@
-# Setting this up on a work repo
+# Running the factory on a work laptop, against a work repo
+
+Current guide (2026-10-25, ADR 0005 factory in `factory/`). The earlier Temporal-era checklist is kept at the bottom.
+
+## What you get
+Brief in RunView (or the API) -> the OpenHands agent runs the ignite process in Docker on the local model -> it asks you
+questions (RunView or Telegram) -> host checks -> a PR on your repo's default branch -> you review and merge.
+Nothing leaves the laptop except git pushes to your repo (and Telegram messages, if you enable it).
+
+## Steps
+```bash
+git clone https://github.com/jagberg/Me.OpenHands.git && cd Me.OpenHands
+factory/bootstrap.sh --repo <org>/<repo> [--langfuse]
+```
+`bootstrap.sh` checks before it acts and can be re-run. It needs: Docker Desktop, Ollama, `gh`, `uv`, git (it tells
+you what to `brew install`), about 20 GB free RAM for qwen3.8:27b, `gh auth login` with access to the repo, and the
+CompareClub ignite plugin installed in Claude Code. It pulls the agent image, builds the 32k model, makes the venv and
+writes two things for you to edit:
+
+| File | Edit |
+|---|---|
+| `~/.config/factory/target.json` | `test_cmd`: host command that runs the repo's tests (a pre-PR check); `protected`: files the agent must not change (glob names, e.g. `"*.sql"`) |
+| `~/.config/factory/overlay/knowledge/project.md` | What the repo is, the test command inside the container, protected files, PRD sections that do not apply |
+
+Then `cd factory && caffeinate -dimsu .venv/bin/python app.py` and open http://127.0.0.1:8766. Stay on mains power.
+
+## How the process gets into a repo that doesn't have it
+The overlay (`~/.config/factory/overlay`, from `factory/overlay-template`) holds `AGENTS.md`, `knowledge/`, the
+`qa-review` and OpenSpec skills and `openspec/config.yaml`. The shell copies it, and the ignite skills, into each run's
+clone and lists every file in `.git/info/exclude`, so none of it reaches the PR and nothing is committed to the work
+repo to set it up. If the repo already has one of those files, the run stops and names it: drop it from the overlay.
+
+## Decide before the first real run
+- **What the PR contains.** The agent's outputs are committed: `intent/<feature>/brief.md`, `openspec/changes/...`,
+  `.ignite/log.md` and `.ignite/qa.md`, plus the code. Keep them (reviewable trail) or add them to the overlay's exclude
+  list later.
+- **Branch protection** on the repo (required review and CI) so the factory can open but never merge a PR.
+- **Data:** code and briefs go only to the local model. Langfuse is local. Check with security before enabling
+  Telegram (a personal app) or sending metrics to DX.
+- **Test command in the container.** The agent runs tests inside `agent-server` (Python 3.13 + Node). A repo that
+  needs other services (databases, private package registries) needs those reachable from the container, or a
+  narrower test command.
+
+## Known limits
+One run at a time; a crash or sleep mid-turn fails the run (retry from RunView/API); slow on the local model (30-45 min
+for a small function); stage boundaries come from the agent's `.ignite/log.md` lines. Bedrock: untested
+(`LLM_MODEL=bedrock/...`, `LLM_BASE_URL=` empty, AWS credentials from SSO).
+
+---
+
+## Earlier checklist (SUPERSEDED 2026-10-25)
+
+**Superseded by:** the guide above. **Why it changed:** ADR 0005 replaced the Temporal blueprint with the OpenHands
+shell in `factory/`; steps 1-2 and 5 below describe `blueprint/`, which is no longer the main path.
+
+### Setting this up on a work repo (2026-10-18)
 
 A checklist for moving the prototype from the toy repo to a real (work) repository. Read `docs/adr/` first.
 

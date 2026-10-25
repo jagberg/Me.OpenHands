@@ -314,3 +314,22 @@ is not stated. Both checked against their own pages on 2026-10-25; third-party r
 moves off local models and multi-vendor routing matters more than Bedrock (the Claude Agent SDK is the more direct
 Bedrock fit).
 **Supersedes:** n/a
+
+## 2026-10-25 - Factory portable to a work laptop and a work repo
+
+**Decision:** `factory/bootstrap.sh` sets the factory up on any Mac, and `~/.config/factory/target.json` points it at a
+work repo; the process files reach that repo as a per-run overlay that is never committed.
+**Reasoning:** The owner wants to run it on the work laptop against a CompareClub repo. The trial setup only worked on
+this Mac: a host test command under `/private/tmp/claude-501/...`, the ignite plugin path pinned to 0.4.0,
+`linux/arm64` hard-coded, `git@github.com` clone URLs, and process files (`AGENTS.md`, `knowledge/`, skills) seeded
+into a throwaway base branch, which would put them in a real repo's PRs.
+**How:** `target.json` (repo, test_cmd, protected, overlay_dir) replaces the trial config when present; PRs then go to
+the repo's default branch. `overlay_dir` (from `factory/overlay-template`: a generic `AGENTS.md`,
+`knowledge/project.md` to fill in, `qa-review` checking the brief and OpenSpec specs instead of the trial's
+`docs/spec.md`, the OpenSpec skills) is copied into each run and git-excluded like the ignite skills; a file the repo
+already has stops the run. Clone via `gh repo clone`; newest installed ignite version; platform from the CPU; pytest in
+the venv for the trial's host check. Checked on a throwaway repo: base branch `main`, `git status` clean after the
+overlay, OpenHands loads all 7 skills. `bootstrap.sh` ran clean on this Mac.
+**Trade-off accepted:** Not yet run against a work repo. The agent's outputs (`intent/`, `openspec/changes/`,
+`.ignite/`) are still committed in the PR; whether a work repo wants them is open (`docs/work-repo-setup.md`).
+**Supersedes:** the 2026-10-18 checklist in `docs/work-repo-setup.md` (kept there, marked superseded).

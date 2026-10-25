@@ -22,6 +22,7 @@ MODEL = os.environ.get("LLM_MODEL", "ollama_chat/qwen3.8-27b-32k")
 LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://host.docker.internal:11434")  # as seen from the container
 SERVER_IMAGE = os.environ.get("AGENT_SERVER_IMAGE", "ghcr.io/openhands/agent-server:1.21.0-python")  # must match openhands-sdk (requirements.txt)
 GATE = Path(os.environ.get("MODEL_GATE_FILE", Path.home() / "llm-compare" / "STATUS.txt"))  # shared-Mac benchmark gate
+PLATFORM = "linux/arm64" if os.uname().machine == "arm64" else "linux/amd64"  # DockerWorkspace defaults to amd64
 MAX_CHECK_RETRIES = 2
 LANGFUSE_ENV = Path.home() / ".config" / "factory" / "langfuse.env"
 OTEL_KEYS = ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_TRACES_HEADERS", "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"]
@@ -131,7 +132,7 @@ def retry(rid):
 # ---------- host side: repo, checks, PR ----------
 def setup_repo(rid):
     r = load(rid); c = r["cfg"]; repo = RUNS / rid / "repo"
-    sh(["git", "clone", "-q", "--depth", "1", f"git@github.com:{c['repo']}.git", str(repo)])
+    sh(["gh", "repo", "clone", c["repo"], str(repo), "--", "-q", "--depth", "1"])  # gh's own protocol and host login
     sh(["git", "config", "user.name", "OpenHands factory"], cwd=repo)
     sh(["git", "config", "user.email", "openhands@localhost"], cwd=repo)
     base = sh(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo).stdout.strip()
@@ -143,9 +144,17 @@ def setup_repo(rid):
             p = repo / "AGENTS.md"; p.write_text(p.read_text().replace(old, new))
         sh(["git", "add", "-A"], cwd=repo); sh(["git", "commit", "-q", "-m", "chore: seed factory test snapshot"], cwd=repo)
     sh(["git", "checkout", "-q", "-b", f"ai/{rid}"], cwd=repo)
+    exclude = lambda rel: open(repo / ".git" / "info" / "exclude", "a").write(f"/{rel}\n")
     for src in c.get("private_skills", []):  # e.g. the ignite plugin's skills: copied per run, never committed or pushed
         src = Path(src).expanduser(); shutil.copytree(src, repo / ".agents" / "skills" / src.name)
-        with open(repo / ".git" / "info" / "exclude", "a") as f: f.write(f"/.agents/skills/{src.name}/\n")
+        exclude(f".agents/skills/{src.name}/")
+    if c.get("overlay_dir"):  # process files for a repo that doesn't carry them (AGENTS.md, knowledge, skills): same rule
+        ov = Path(c["overlay_dir"]).expanduser()
+        for f in (f for f in sorted(ov.rglob("*")) if f.is_file()):
+            rel = f.relative_to(ov)
+            if (repo / rel).exists():
+                raise RuntimeError(f"{rel} already exists in {c['repo']}; drop it from the overlay {ov}")
+            (repo / rel).parent.mkdir(parents=True, exist_ok=True); shutil.copy2(f, repo / rel); exclude(rel)
     update(rid, lambda r: r.update(base_branch=base, head_branch=f"ai/{rid}"))
 
 def run_checks(rid):
@@ -228,7 +237,7 @@ def agent_turn(rid, message):
     os.environ.update(langfuse_otel(rid))
     t0 = time.time()
     try:
-        ws = DockerWorkspace(server_image=SERVER_IMAGE, platform="linux/arm64", volumes=[f"{d}:/workspace"],
+        ws = DockerWorkspace(server_image=SERVER_IMAGE, platform=PLATFORM, volumes=[f"{d}:/workspace"],
                              forward_env=["DEBUG", *OTEL_KEYS])
     finally:
         for k in OTEL_KEYS:

@@ -20,6 +20,7 @@ human merges/closes the PR ─▶ dashboard marks the run merged/closed
 | `app.py` | RunView (`../dashboard/index.html`) + `POST /api/briefs`, `POST /api/runs/<id>/answer`, `GET /api/runs` |
 
 ## Run
+New machine or a work repo: `./bootstrap.sh [--repo org/name] [--langfuse]`, then `../docs/work-repo-setup.md`.
 ```bash
 uv venv .venv --python 3.12 && uv pip install --python .venv/bin/python -r requirements.txt
 caffeinate -dimsu .venv/bin/python app.py      # http://127.0.0.1:8766 ; needs Docker, Ollama, your git + gh login

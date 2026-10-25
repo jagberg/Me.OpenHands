@@ -13,18 +13,33 @@ from pathlib import Path
 import shell, telegram
 
 ROOT = Path(__file__).resolve().parent.parent
+TARGET = Path.home() / ".config" / "factory" / "target.json"  # your repo; see docs/work-repo-setup.md
+
+
+def ignite_skills():
+    """The installed ignite plugin's brief/plan/build skills, newest version (Claude Code's plugin cache)."""
+    vers = sorted(Path.home().glob(".claude/plugins/cache/compareclub-ignite/ignite/*/skills"),
+                  key=lambda p: [int(x) for x in p.parent.name.split(".") if x.isdigit()])
+    return [str(vers[-1] / s) for s in ("brief", "plan", "build")] if vers else []
+
+
 QA_CFG = {  # verified 2026-10-23 (PR #5): stand-in ignite skills, QA-only checklist, buggy calc.py
     "repo": "jagberg/ai-agent-trial-sandbox",
     "seed_dir": str(ROOT / "bakeoff" / "fixture-qa"),
     "seed_replace": {"/private/tmp/claude-501/bake/pyenv/bin/python -m pytest -q": "python3 -m pytest -q (pip install pytest if missing)"},
-    "test_cmd": "/private/tmp/claude-501/bake/pyenv/bin/python -m pytest -q",  # host-side check
+    "test_cmd": f"{sys.executable} -m pytest -q",  # host-side check; pytest is in requirements.txt
     "protected": ["test_calc.py"],
 }
-DEFAULT_CFG = {  # real ignite skills (CompareClub plugin, copied per run, never pushed) + OpenSpec + median() feature
+TRIAL_CFG = {  # real ignite skills (CompareClub plugin, copied per run, never pushed) + OpenSpec + median() feature
     **QA_CFG,
     "seed_dir": str(ROOT / "bakeoff" / "fixture-ignite"), "seed_replace": {},
-    "private_skills": [f"~/.claude/plugins/cache/compareclub-ignite/ignite/0.4.0/skills/{s}" for s in ("brief", "plan", "build")],
+    "private_skills": ignite_skills(),
 }
+# target.json (a work repo: repo, test_cmd, protected, overlay_dir) replaces the trial; no seed_dir, so PRs go to the
+# repo's default branch and the process files stay out of them.
+DEFAULT_CFG = {"private_skills": ignite_skills(), **json.loads(TARGET.read_text())} if TARGET.exists() else TRIAL_CFG
+if not DEFAULT_CFG.get("private_skills"):
+    print("warning: ignite plugin not found under ~/.claude/plugins/cache; install it in Claude Code", file=sys.stderr)
 _pr: dict = {}
 
 def pr_state(url):
