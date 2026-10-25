@@ -233,3 +233,84 @@ agent time, 67 LLM calls, about 1.03M input tokens. Plan was the heaviest stage 
 the fresh-conversation runs did. The nudge is a workaround for a local-model habit; a model that calls `finish` never
 sees it. `caffeinate -s` does not stop sleep on battery: one run failed when the Mac slept (container start timed out).
 **Supersedes:** the "same conversation resumes" claims in the 2026-10-23 and 2026-10-24 entries (kept as written).
+
+## 2026-10-25 - Per-stage metrics corrected; turns, answers and nudges per stage
+
+**Decision:** RunView's stage table adds lead time, turns, human answers and nudges per stage, and the split of each
+stage's time into agent time and human wait is corrected.
+**Reasoning:** The owner wants to measure each stage's refinement cost, e.g. "how many prompts does planning need
+before it can build". Turns (container runs), answers (product-owner messages), nudges and check retries per stage
+answer that; lead time = agent time + human wait.
+**Correction to the record:** The entry above ("Resume really resumes") reports plan as 1,228 s for
+`run-20261025-081007`. That was wall clock including human wait. Every resumed container writes a
+`ConversationStateUpdateEvent` a few ms before the human's answer, so each wait was counted as agent time and "Human
+wait" showed nothing. `stage_metrics` now treats a state update under 1 s before a user message as that message.
+Recomputed: plan 909 s agent time + 72 s human wait; the other 247 s of its 1,228 s lead time are gaps that end in a
+nudge or factory message (shell time, counted as neither). Brief 411 s + 140 s.
+Also fixed: one turn spanning two log lines of the same stage was counted twice when the rows merged.
+**Result:** `run-20261025-200741` (PR https://github.com/jagberg/ai-agent-trial-sandbox/pull/8, merged): brief 3 turns,
+2 answers, 11m42s agent + 7m53s wait; plan 1 turn, 1 answer, 5 nudges, 29m24s agent + 9m24s wait, 707k input tokens;
+build 3 nudges, 4m17s; QA 48 s. Lead time = agent + wait within 1 s for every stage of this run.
+**Trade-off accepted:** Stage boundaries still come from the agent's own `.ignite/log.md` lines; a skipped or reworded
+line merges or loses a stage. The per-turn `turns[]` list in `run.json` holds running conversation totals, not
+per-turn counts; do not sum it (RunView sums the per-stage fields).
+**Supersedes:** the plan-stage timing in the "Resume really resumes" entry (kept as written).
+
+## 2026-10-25 - Local Langfuse for LLM traces, beside RunView
+
+**Decision:** Send the agent's traces to a local, self-hosted Langfuse (`observability/langfuse/`), one Langfuse session
+per factory run, and keep RunView for the lifecycle and human answers.
+**Reasoning:** CompareClub already uses Langfuse. The OpenHands agent server already emits OpenTelemetry traces through
+its Laminar integration (`openhands/sdk/observability/laminar.py`) when `OTEL_EXPORTER_OTLP_TRACES_*` is set, so no
+agent code changes: every LLM call arrives with model, input/output tokens and latency. Local, not the company instance,
+because traces contain prompts, code and the CompareClub ignite skill text (owner's choice, 2026-10-25).
+**How:**
+- Langfuse's official compose at v4.56.0, images pinned, every port on 127.0.0.1. Secrets and the headless-init
+  project/user/keys live in `~/.config/factory/langfuse-server.env` and `langfuse.env` (mode 600), never in the repo.
+- The shell passes the OTLP settings into the agent container only (`forward_env`), then removes them from its own
+  environment: with them set, the host SDK's tracing turned on too and crashed on its older `lmnr` 0.8.0 ("unexpected
+  keyword argument 'rollout_entrypoint'", first attempt of `run-20261025-200741`).
+- Langfuse groups traces into sessions only from a `session.id` span attribute, and Laminar sets none. An OTel
+  collector (`otel/opentelemetry-collector-contrib:0.162.0`, `otel-collector.yaml`) stamps the shell's
+  `X-Factory-Run` export header on every span as `session.id`. Its batch processor must keep `authorization` in
+  `metadata_keys` or Langfuse returns 401.
+**Result:** `run-20261025-200741`: Langfuse totals match the run's own stats exactly (74 LLM calls, 1,159,565 input
+tokens); every call after the collector was added sits in session `run-20261025-200741`.
+**Trade-off accepted:** About 7 more containers (Postgres, ClickHouse, Redis, MinIO, web, worker, collector) in Docker's
+8.3 GB. Project keys are visible to `docker inspect` on this Mac. Stock CHANGEME passwords remain for the internal
+services, acceptable only because nothing listens beyond 127.0.0.1. Langfuse shows calls and cost, not stages or gates.
+**Alternatives rejected:** Laminar self-hosted (the SDK's native target, but not what the company uses); Arize Phoenix
+(lightest, but Elastic License 2.0, not OSI open source); Grafana on Langfuse's ClickHouse (SQL panels to maintain).
+**Open:** whether Langfuse's built-in dashboards plus Jira statuses (once intake is Jira) can retire RunView; the
+Answer button and per-stage view are what keep RunView today.
+**Supersedes:** the "add Langfuse later" note in ADR 0004 (now adopted alongside RunView; ADR updated with a pointer).
+
+## 2026-10-25 - No Temporal in the factory shell (recording an existing decision)
+
+**Decision:** `factory/` keeps a plain in-process queue and `run.json`, not Temporal.
+**Reasoning:** Recorded here because no entry said it outright. ADR 0005 moved the stage order into the agent's prompts,
+because a coded workflow could not model the QA -> brief loop without becoming a custom harness, and kept Temporal
+"only if durable cross-system waits need it". The 2026-10-23 entry reused OpenHands' own conversation persistence for
+the human wait. Temporal is not unsuitable for agents: its workflow code must be deterministic, but agent turns run as
+activities it records and retries. The mistake in ADR 0001 was putting the process in the workflow, not using Temporal.
+**Trade-off accepted:** A crash or sleep mid-turn marks the run failed and needs a manual `POST /api/runs/<id>/retry`;
+no heartbeat catches a hung container; one run at a time.
+**Revisit when:** runs are concurrent (e.g. Bedrock instead of one local model), the factory moves to a server, or
+briefs arrive from Jira. Then wrap the shell's outer loop as a Temporal workflow (turn = activity, answer = signal),
+leaving the process in the prompts, consistent with ADR 0005.
+**Supersedes:** n/a
+
+## 2026-10-25 - Warp Factories and Amp: watched, not adopted
+
+**Decision:** Do not adopt Warp Factories or Amp (ampcode.com) now.
+**Reasoning:** Warp Factories (warp.dev, announced 2026-08-18) is a factory-level product (foreman, triage/spec/
+implement/review agents, control room, metrics), but closed beta; its harnesses are Claude Code, Codex and Warp's own
+agent (OpenHands not mentioned); Bedrock/local models not confirmed; no hard code gates. Amp is a harness-level
+alternative to OpenHands, not a factory: skills, AGENTS.md, MCP, execute mode and an SDK, self-hosted runners free,
+bring-your-own-key, but it routes across frontier models (no local $0 runs), Bedrock is not confirmed, and the licence
+is not stated. Both checked against their own pages on 2026-10-25; third-party reviews of Amp contradict each other.
+**Worth borrowing:** Warp's metric categories (throughput, cost, quality, ROI) and observer agents.
+**Revisit when:** Warp Factories opens and confirms bring-your-own model and self-hosting; for Amp, if the factory
+moves off local models and multi-vendor routing matters more than Bedrock (the Claude Agent SDK is the more direct
+Bedrock fit).
+**Supersedes:** n/a

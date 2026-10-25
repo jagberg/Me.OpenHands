@@ -10,7 +10,7 @@ The process (brief -> plan -> build -> QA, loop-backs, when to ask) lives in the
 Layout per run: runs/<id>/ is mounted at /workspace; the repo is cloned into runs/<id>/repo (/workspace/repo); the
 agent server keeps its conversation state in runs/<id>/conversations, outside the repo.
 """
-import fnmatch, json, os, queue, shutil, subprocess, threading, time, uuid
+import base64, fnmatch, json, os, queue, shutil, subprocess, threading, time, uuid
 from datetime import datetime
 from pathlib import Path
 
@@ -23,8 +23,9 @@ LLM_BASE_URL = os.environ.get("LLM_BASE_URL", "http://host.docker.internal:11434
 SERVER_IMAGE = os.environ.get("AGENT_SERVER_IMAGE", "ghcr.io/openhands/agent-server:1.21.0-python")  # must match openhands-sdk (requirements.txt)
 GATE = Path(os.environ.get("MODEL_GATE_FILE", Path.home() / "llm-compare" / "STATUS.txt"))  # shared-Mac benchmark gate
 MAX_CHECK_RETRIES = 2
-now = lambda: datetime.now().isoformat(timespec="seconds")
-secs_between = lambda a, b: (datetime.fromisoformat(b) - datetime.fromisoformat(a)).total_seconds() if b else 0
+LANGFUSE_ENV = Path.home() / ".config" / "factory" / "langfuse.env"
+OTEL_KEYS = ["OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", "OTEL_EXPORTER_OTLP_TRACES_HEADERS", "OTEL_EXPORTER_OTLP_TRACES_PROTOCOL"]
+now =lambda: datetime.now().isoformat(timespec="seconds")
 
 
 def sh(cmd, cwd=None, check=True, timeout=600):
@@ -185,6 +186,18 @@ def open_pr(rid):
 
 
 # ---------- agent side: one turn of the conversation, in Docker ----------
+def langfuse_otel(rid):
+    """OTLP settings for the agent server's built-in tracing (openhands/sdk/observability/laminar.py), sent through the
+    OTel collector in observability/langfuse, which stamps X-Factory-Run on every span as session.id so Langfuse groups
+    a run's traces. Optional: ~/.config/factory/langfuse.env (chmod 600) with LANGFUSE_PUBLIC_KEY=, LANGFUSE_SECRET_KEY=
+    and OTLP_ENDPOINT= as seen from the container (default: the local collector)."""
+    if not LANGFUSE_ENV.exists():
+        return {}
+    c = dict(l.split("=", 1) for l in LANGFUSE_ENV.read_text().split() if "=" in l)
+    auth = base64.b64encode(f"{c['LANGFUSE_PUBLIC_KEY']}:{c['LANGFUSE_SECRET_KEY']}".encode()).decode()
+    endpoint = c.get("OTLP_ENDPOINT", "http://host.docker.internal:4318/v1/traces")
+    return dict(zip(OTEL_KEYS, [endpoint, f"Authorization=Basic%20{auth},X-Factory-Run={rid}", "http/protobuf"]))
+
 def agent_turn(rid, message):
     from openhands.sdk import LLM, Agent, AgentContext, Conversation
     from openhands.sdk.context.condenser import LLMSummarizingCondenser
@@ -209,8 +222,18 @@ def agent_turn(rid, message):
     last = max([t["ended"] for t in r.get("turns", [])[-1:]] + [r.get("failed_at") or 0])  # a failed turn holds it too
     if last and r["conversation_id"]:
         time.sleep(max(0.0, 50 - (time.time() - last)))
+    # Only the agent server in Docker (where the LLM calls happen) traces, via forward_env, which reads os.environ when
+    # the container starts. The keys are removed again at once: with them set, the host SDK's lazy observe() turns on
+    # too and crashes on its older lmnr 0.8.0 ("unexpected keyword argument 'rollout_entrypoint'", 2026-10-25).
+    os.environ.update(langfuse_otel(rid))
     t0 = time.time()
-    with DockerWorkspace(server_image=SERVER_IMAGE, platform="linux/arm64", volumes=[f"{d}:/workspace"]) as w:
+    try:
+        ws = DockerWorkspace(server_image=SERVER_IMAGE, platform="linux/arm64", volumes=[f"{d}:/workspace"],
+                             forward_env=["DEBUG", *OTEL_KEYS])
+    finally:
+        for k in OTEL_KEYS:
+            os.environ.pop(k, None)
+    with ws as w:
         cid = uuid.UUID(r["conversation_id"]) if r["conversation_id"] else None
         # delete_on_close=False: the factory default is True, and close() then deletes the conversation server-side, so
         # every resume silently started a fresh one (runs 2026-10-23..24; found because conversations/ was empty).

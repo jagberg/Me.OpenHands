@@ -35,3 +35,8 @@ state from Temporal, so it stores nothing of its own.
 - We maintain ~240 lines of dashboard code.
 - RunView has **no authentication** and binds to 127.0.0.1. It must get auth before it is exposed on any network.
 - Screenshots and the v1/v2 comparison page are in `docs/visuals/`.
+
+**Update 2026-10-21 / 2026-10-25:** The Temporal UI half no longer applies: ADR 0005 moved the process into the agent
+harness, and `factory/` (2026-10-23) has no Temporal, so RunView reads `runs/<id>/run.json` and the OpenHands event
+files. The Langfuse alternative above was adopted on 2026-10-25 for per-call traces and cost, beside RunView, not
+instead of it (`CHANGELOG.md`, "Local Langfuse for LLM traces"). RunView keeps the lifecycle and the Answer button.

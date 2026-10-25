@@ -47,6 +47,11 @@ Telegram relay (`telegram.py`, optional): create `~/.config/factory/telegram.env
 `TELEGRAM_BOT_TOKEN=` (a dedicated bot) and `TELEGRAM_CHAT_ID=` (`.venv/bin/python telegram.py chat-id` after messaging
 the bot). Questions arrive with the agent's reasoning; reply to answer. Check: `.venv/bin/python test_telegram.py`.
 
+Langfuse traces (optional): `docker compose -p langfuse --env-file ~/.config/factory/langfuse-server.env up -d` in
+`../observability/langfuse` (local Langfuse 4.56.0 + an OTel collector, all on 127.0.0.1), then put the project keys in
+`~/.config/factory/langfuse.env` (mode 600): `LANGFUSE_PUBLIC_KEY=`, `LANGFUSE_SECRET_KEY=`. Each run is one Langfuse
+session at http://127.0.0.1:3000/project/factory/sessions/<run id> (RunView links to it). Why and how: `CHANGELOG.md`.
+
 ## Gotchas found
 - **Conversation lease:** the agent server leases a conversation for 45 s and a stopped container does not release it;
   a resume inside that window fails with `ConversationLeaseHeldError` (HTTP 500). The shell closes the conversation and
@@ -56,5 +61,5 @@ the bot). Questions arrive with the agent's reasoning; reply to answer. Check: `
 - `DockerWorkspace` defaults to `linux/amd64`; set `linux/arm64` on Apple silicon.
 
 ## Not built yet
-Per-stage token/time split (the stage table shows the run's totals on the last stage), AI review comment on the PR,
+Durable runs (a crash or sleep mid-turn fails the run; retry is manual; see the Temporal entry in `CHANGELOG.md`), AI review comment on the PR,
 Jira intake and an enterprise chat channel (Telegram is the trial relay), dashboard auth, Bedrock, running the shell itself in a container.

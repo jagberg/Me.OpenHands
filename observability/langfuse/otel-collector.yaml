@@ -1,0 +1,39 @@
+# Sits between the OpenHands agent server and Langfuse. The factory shell sends each run's id as an exporter header
+# (X-Factory-Run); this stamps it on every span as session.id, which Langfuse uses to group a run's traces. Langfuse
+# reads session ids only from span attributes, and the agent server's tracer (Laminar) sets none (checked 2026-10-25).
+# The shell's Authorization header is passed through to Langfuse, so no keys live here.
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+        include_metadata: true
+
+extensions:
+  headers_setter:
+    headers:
+      - key: Authorization
+        from_context: authorization
+
+processors:
+  attributes/run:  # before batch: batching drops the request metadata
+    actions:
+      - key: session.id
+        from_context: metadata.x-factory-run
+        action: upsert
+  batch:
+    metadata_keys: [authorization]  # keep the header in the batch's context for headers_setter (401 without it)
+
+exporters:
+  otlphttp/langfuse:
+    endpoint: http://langfuse-web:3000/api/public/otel
+    auth:
+      authenticator: headers_setter
+
+service:
+  extensions: [headers_setter]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [attributes/run, batch]
+      exporters: [otlphttp/langfuse]
