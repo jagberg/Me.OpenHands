@@ -264,23 +264,63 @@ def stage_metrics(rid, lines, stages):
     for st in d.glob("*/base_state.json"):
         for u in json.loads(st.read_text()).get("stats", {}).get("usage_to_metrics", {}).values():
             lat.update({x["response_id"]: x["latency"] for x in u.get("response_latencies", [])})
-    cum, cum_at = [0, 0], []
+    cum, cum_at, kinds, tix, turn = [0, 0], [], [], [], 0
     for e in evs:
         if e["kind"] == "ConversationStateUpdateEvent" and e.get("key") == "stats":
             cum = usage(e)
         cum_at.append(cum)
+        k = user_kind(e)
+        turn += k not in (None, "nudges")  # every message but a nudge starts a new shell turn
+        kinds.append(k); tix.append(turn)
+    # Which user message each gap (ts[j-1]..ts[j]) leads into. A resumed container writes a state update a few ms
+    # before the human's answer, which hid every wait as agent time (run-20261025-200741), so a state update under 1 s
+    # before a user message counts as that message.
+    ends = [None] * len(evs)
+    for j in range(len(evs) - 1, -1, -1):
+        if evs[j]["kind"] == "MessageEvent" and evs[j]["source"] == "user":
+            ends[j] = kinds[j]
+        elif evs[j]["kind"] == "ConversationStateUpdateEvent" and j + 1 < len(evs) and ts[j + 1] - ts[j] < 1:
+            ends[j] = ends[j + 1]
     starts[0] = 0  # reading AGENTS.md etc. before the first log line is first-stage work
     for n, (s, a) in enumerate(zip(stages, starts)):
         b = starts[n + 1] if n + 1 < len(starts) else len(evs)  # the LLM call that wrote a stage's log line counts to it
         acts = [e for e in evs[a:b] if e["kind"] == "ActionEvent"]
         calls = {e["llm_response_id"] for e in evs[a:b] if e.get("llm_response_id")}  # actions + final replies
-        work = sum(ts[j] - ts[j - 1] for j in range(max(a, 1), b) if not (evs[j]["kind"] == "MessageEvent" and evs[j]["source"] == "user"))
+        work = sum(ts[j] - ts[j - 1] for j in range(max(a, 1), b) if not ends[j])
         before = cum_at[a - 1] if a else [0, 0]
         known = [lat[c] for c in calls if c in lat]
         s.update(duration_s=round(work), llm_calls=len(calls), tool_calls=len(acts),
                  prompt_tokens=cum_at[b - 1][0] - before[0], completion_tokens=cum_at[b - 1][1] - before[1],
-                 avg_latency_s=round(sum(known) / len(known), 1) if known else None)
-    return stages
+                 avg_latency_s=round(sum(known) / len(known), 1) if known else None,
+                 turn_ids={tix[j] for j in range(a, b) if evs[j]["kind"] == "ActionEvent"},
+                 wait_s=round(sum(ts[j] - ts[j - 1] for j in range(max(a, 1), b) if ends[j] == "prompts")),
+                 lead_s=round(ts[min(b, len(evs) - 1)] - ts[a]),  # wall clock from this stage's start to the next one's
+                 **{k: kinds[a:b].count(k) for k in ("prompts", "nudges", "check_retries", "retries")})
+    merged = []  # two log lines for one stage (e.g. "build: start", "build: done") are one row; a later return is rework
+    for s in stages:
+        if merged and merged[-1]["name"] == s["name"]:
+            m = merged[-1]
+            for k, v in s.items():
+                if isinstance(v, (int, float)) and k != "avg_latency_s":
+                    m[k] = m.get(k, 0) + v
+            m["turn_ids"] = m.get("turn_ids", set()) | s.get("turn_ids", set())  # one turn can span both lines
+        else:
+            merged.append(s)
+    for m in merged:  # sets don't serialise; keep the count
+        if "turn_ids" in m:
+            m["turns"] = len(m.pop("turn_ids"))
+    return merged
+
+
+USER_KINDS = [("Answer from the product owner", "prompts"), (NUDGE[:30], "nudges"),
+              ("The factory's checks failed", "check_retries"), ("The previous turn was interrupted", "retries")]
+
+def user_kind(e):
+    """Classify a user message by the shell's own wording: a human answer, a nudge, check feedback, a retry or the brief."""
+    if e["kind"] != "MessageEvent" or e.get("source") != "user":
+        return None
+    text = "".join(c.get("text", "") for c in e.get("llm_message", {}).get("content", []))
+    return next((k for p, k in USER_KINDS if text.startswith(p)), "brief")
 
 
 def step(rid, message):
@@ -291,8 +331,6 @@ def step(rid, message):
     def rec(r):
         r["stages"] = stages_from_log(rid)
         r.setdefault("turns", []).append({"ts": now(), "ended": time.time(), "seconds": secs, **stats, "final": final[-2000:]})
-        for i, st in enumerate(r["stages"]):  # time each stage spent waiting on a human
-            st["wait_s"] = sum(secs_between(q["asked_at"], q.get("answered_at")) for q in r["questions"] if q.get("stage_idx") == i)
         if r["stages"] and "llm_calls" not in r["stages"][0]:  # no events (old runs): run totals on the last stage row
             tot = lambda k: sum(t.get(k, 0) for t in r["turns"])
             r["stages"][-1].update(duration_s=tot("seconds"), llm_calls=tot("llm_calls"),
