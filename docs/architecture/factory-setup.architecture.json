@@ -1,0 +1,325 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Factory setup: custom code and what OpenHands loads",
+    "quality_profile": "showcase",
+    "views": [
+      {
+        "id": "custom",
+        "label": "Custom code",
+        "focus": [
+          "telegram",
+          "server",
+          "shell",
+          "agentsmd",
+          "knowledge",
+          "llmcfg"
+        ],
+        "note": "Everything we wrote: the shell, the server, the relay, the AGENTS.md adapter and the agent config."
+      },
+      {
+        "id": "loaded",
+        "label": "Loaded into OpenHands",
+        "focus": [
+          "agent",
+          "agentsmd",
+          "ignite",
+          "openspec",
+          "tools",
+          "llmcfg",
+          "knowledge"
+        ],
+        "note": "Per run: the repo's AGENTS.md and .agents/skills via load_project_skills, two SDK tools, the LLM and condenser."
+      },
+      {
+        "id": "installed",
+        "label": "Installed, not written",
+        "focus": [
+          "agent",
+          "qwen",
+          "gh"
+        ],
+        "note": "Docker image agent-server 1.21.0, Ollama with qwen3.8:27b, and your gh login."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "telegram",
+      "type": "frontend",
+      "label": "telegram.py",
+      "sublabel": "optional relay",
+      "pos": [
+        40,
+        120
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "custom"
+    },
+    {
+      "id": "server",
+      "type": "frontend",
+      "label": "app.py :8766",
+      "sublabel": "API + RunView",
+      "pos": [
+        230,
+        120
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "custom"
+    },
+    {
+      "id": "shell",
+      "type": "backend",
+      "label": "shell.py",
+      "sublabel": "gates, checks, PR",
+      "pos": [
+        40,
+        280
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "custom"
+    },
+    {
+      "id": "gh",
+      "type": "external",
+      "label": "GitHub",
+      "sublabel": "gh CLI on host",
+      "pos": [
+        40,
+        440
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "agentsmd",
+      "type": "security",
+      "label": "AGENTS.md",
+      "sublabel": "adapter + qa-review",
+      "pos": [
+        450,
+        120
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "custom"
+    },
+    {
+      "id": "ignite",
+      "type": "security",
+      "label": "ignite skills",
+      "sublabel": "brief, plan, build",
+      "pos": [
+        640,
+        120
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "CompareClub"
+    },
+    {
+      "id": "openspec",
+      "type": "security",
+      "label": "OpenSpec",
+      "sublabel": "propose + apply",
+      "pos": [
+        830,
+        120
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "third-party"
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "OpenHands agent",
+      "sublabel": "agent-server 1.21.0",
+      "pos": [
+        640,
+        280
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "Docker"
+    },
+    {
+      "id": "tools",
+      "type": "backend",
+      "label": "SDK tools",
+      "sublabel": "terminal, file_editor",
+      "pos": [
+        450,
+        440
+      ],
+      "size": [
+        150,
+        64
+      ]
+    },
+    {
+      "id": "llmcfg",
+      "type": "backend",
+      "label": "LLM config",
+      "sublabel": "32k + condenser",
+      "pos": [
+        640,
+        440
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "custom"
+    },
+    {
+      "id": "knowledge",
+      "type": "database",
+      "label": "knowledge/",
+      "sublabel": "decided settings",
+      "pos": [
+        830,
+        440
+      ],
+      "size": [
+        150,
+        64
+      ],
+      "tag": "custom"
+    },
+    {
+      "id": "qwen",
+      "type": "cloud",
+      "label": "qwen3.8:27b",
+      "sublabel": "Ollama :11434",
+      "pos": [
+        1080,
+        280
+      ],
+      "size": [
+        150,
+        64
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Custom host code",
+      "wraps": [
+        "telegram",
+        "server",
+        "shell"
+      ]
+    },
+    {
+      "kind": "region",
+      "label": "Loaded into OpenHands per run",
+      "wraps": [
+        "agentsmd",
+        "ignite",
+        "openspec",
+        "agent",
+        "tools",
+        "llmcfg",
+        "knowledge"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "answers",
+      "from": "telegram",
+      "to": "shell",
+      "label": "answers",
+      "variant": "dashed",
+      "labelAt": [
+        115,
+        232
+      ]
+    },
+    {
+      "id": "queue",
+      "from": "server",
+      "to": "shell",
+      "label": "queue"
+    },
+    {
+      "id": "turn",
+      "from": "shell",
+      "to": "agent",
+      "label": "turn + nudges",
+      "variant": "emphasis"
+    },
+    {
+      "id": "model",
+      "from": "agent",
+      "to": "qwen",
+      "label": "litellm"
+    },
+    {
+      "id": "pr",
+      "from": "shell",
+      "to": "gh",
+      "label": "push + PR",
+      "variant": "emphasis",
+      "labelAt": [
+        115,
+        392
+      ]
+    }
+  ],
+  "cards": [
+    {
+      "dot": "slate",
+      "title": "Install (not written by us)",
+      "items": [
+        "Docker Desktop + agent-server:1.21.0-python",
+        "Ollama + qwen3.8:27b (Modelfile, num_ctx 32768)",
+        "Python 3.12 venv: openhands-sdk 1.21.0",
+        "gh auth login; ignite plugin in Claude Code"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "Custom (this repo)",
+      "items": [
+        "factory/: shell.py, app.py, telegram.py",
+        "dashboard/index.html (RunView)",
+        "bakeoff/fixture-ignite: AGENTS.md, knowledge/, qa-review",
+        "Agent config: 2 tools, 32k, condenser, nudges"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Gotchas",
+      "items": [
+        "app.py:20 test_cmd is a path on this Mac",
+        "Image and SDK versions must match",
+        "Battery sleep kills runs: stay on AC",
+        "ignite skills: never commit (public repo)"
+      ]
+    }
+  ]
+}
